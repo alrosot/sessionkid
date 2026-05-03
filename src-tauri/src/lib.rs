@@ -26,6 +26,7 @@ const MENU_OPEN: &str = "open";
 const MENU_QUIT: &str = "quit";
 const CODEX_EVENT_NAME: &str = "codex-session-event";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+const SESSION_STATE_FILE: &str = "session-state.json";
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -804,6 +805,18 @@ fn apply_tray_state(app: &AppHandle, state: TrayState) -> tauri::Result<()> {
   Ok(())
 }
 
+fn session_state_path(app: &AppHandle) -> Result<PathBuf, String> {
+  let app_data_dir = app
+    .path()
+    .app_data_dir()
+    .map_err(|error| format!("failed to resolve app data directory: {error}"))?;
+
+  fs::create_dir_all(&app_data_dir)
+    .map_err(|error| format!("failed to create app data directory: {error}"))?;
+
+  Ok(app_data_dir.join(SESSION_STATE_FILE))
+}
+
 #[tauri::command]
 fn set_tray_state(app: AppHandle, state: TrayState) -> Result<(), String> {
   apply_tray_state(&app, state).map_err(|error| error.to_string())?;
@@ -824,6 +837,22 @@ fn set_tray_state(app: AppHandle, state: TrayState) -> Result<(), String> {
 #[tauri::command]
 fn reveal_main_window(app: AppHandle) -> Result<(), String> {
   show_main_window(&app).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn load_session_state(app: AppHandle) -> Result<Option<String>, String> {
+  let path = session_state_path(&app)?;
+  match fs::read_to_string(path) {
+    Ok(state) => Ok(Some(state)),
+    Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+    Err(error) => Err(format!("failed to read session state: {error}"))
+  }
+}
+
+#[tauri::command]
+fn save_session_state(app: AppHandle, state_json: String) -> Result<(), String> {
+  let path = session_state_path(&app)?;
+  fs::write(path, state_json).map_err(|error| format!("failed to write session state: {error}"))
 }
 
 #[tauri::command]
@@ -1197,6 +1226,8 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       set_tray_state,
       reveal_main_window,
+      load_session_state,
+      save_session_state,
       codex_list_models,
       codex_start_session,
       codex_set_session_model,

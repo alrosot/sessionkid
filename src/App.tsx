@@ -119,6 +119,10 @@ function groupActivities(activities: Session["activities"]): ActivityGroup[] {
   return groups;
 }
 
+function isTauriRuntime() {
+  return Boolean((window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
+}
+
 export default function App() {
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
@@ -142,24 +146,47 @@ export default function App() {
   const runner = useMemo(() => new CodexRunner(), []);
 
   useEffect(() => {
-    const savedWidth = window.localStorage.getItem(SIDEBAR_KEY);
-    if (savedWidth) {
-      const parsedWidth = Number(savedWidth);
-      if (Number.isFinite(parsedWidth)) {
-        setSidebarWidth(clampSidebarWidth(parsedWidth));
+    let cancelled = false;
+
+    async function hydrateAppState() {
+      const savedWidth = window.localStorage.getItem(SIDEBAR_KEY);
+      if (savedWidth) {
+        const parsedWidth = Number(savedWidth);
+        if (Number.isFinite(parsedWidth)) {
+          setSidebarWidth(clampSidebarWidth(parsedWidth));
+        }
       }
+
+      const savedTheme = window.localStorage.getItem(THEME_KEY);
+      if (savedTheme === "light" || savedTheme === "dark") {
+        setTheme(savedTheme);
+      }
+
+      let storedSessionState = window.localStorage.getItem(SESSION_STATE_KEY);
+      if (isTauriRuntime()) {
+        try {
+          storedSessionState = await invoke<string | null>("load_session_state");
+        } catch {
+          storedSessionState = window.localStorage.getItem(SESSION_STATE_KEY);
+        }
+      }
+
+      if (cancelled) {
+        return;
+      }
+
+      dispatch({
+        type: "hydrate",
+        state: parseStoredSessionAppState(storedSessionState)
+      });
+      setHasHydratedState(true);
     }
 
-    const savedTheme = window.localStorage.getItem(THEME_KEY);
-    if (savedTheme === "light" || savedTheme === "dark") {
-      setTheme(savedTheme);
-    }
+    void hydrateAppState();
 
-    dispatch({
-      type: "hydrate",
-      state: parseStoredSessionAppState(window.localStorage.getItem(SESSION_STATE_KEY))
-    });
-    setHasHydratedState(true);
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -176,7 +203,17 @@ export default function App() {
       return;
     }
 
-    window.localStorage.setItem(SESSION_STATE_KEY, JSON.stringify(state));
+    const serializedState = JSON.stringify(state);
+    if (isTauriRuntime()) {
+      void invoke("save_session_state", {
+        stateJson: serializedState
+      }).catch(() => {
+        window.localStorage.setItem(SESSION_STATE_KEY, serializedState);
+      });
+      return;
+    }
+
+    window.localStorage.setItem(SESSION_STATE_KEY, serializedState);
   }, [hasHydratedState, state]);
 
   useEffect(() => {
