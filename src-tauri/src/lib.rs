@@ -69,10 +69,26 @@ struct CodexSessionRef {
   session_id: String
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CodexSessionModelInput {
+  session_id: String,
+  model: String
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct CodexStartSessionOutput {
   session_id: String
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CodexModelOption {
+  id: String,
+  display_name: String,
+  input_modalities: Vec<String>,
+  is_default: bool
 }
 
 #[derive(Debug)]
@@ -776,6 +792,78 @@ fn reveal_main_window(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn codex_list_models(
+  app: AppHandle,
+  state: State<'_, AppState>
+) -> Result<Vec<CodexModelOption>, String> {
+  let mut service = state
+    .codex
+    .lock()
+    .map_err(|_| "session state was poisoned".to_string())?;
+  let sessions = service.sessions.clone();
+  if service.client.is_none() {
+    service.client = Some(CodexAppServer::spawn(&app, sessions)?);
+  }
+  let client = service
+    .client
+    .as_ref()
+    .ok_or_else(|| "failed to initialize codex app-server".to_string())?;
+
+  let response = client.send_request(
+    "model/list",
+    json!({
+      "limit": 50,
+      "includeHidden": false
+    })
+  )?;
+
+  let models = response
+    .get("data")
+    .and_then(Value::as_array)
+    .cloned()
+    .unwrap_or_default()
+    .into_iter()
+    .filter_map(|entry| {
+      let id = entry
+        .get("id")
+        .or_else(|| entry.get("model"))
+        .and_then(Value::as_str)?
+        .to_string();
+      let display_name = entry
+        .get("displayName")
+        .and_then(Value::as_str)
+        .unwrap_or(&id)
+        .to_string();
+      let input_modalities = entry
+        .get("inputModalities")
+        .and_then(Value::as_array)
+        .map(|modalities| {
+          modalities
+            .iter()
+            .filter_map(Value::as_str)
+            .map(str::to_string)
+            .collect::<Vec<_>>()
+        })
+        .filter(|modalities| !modalities.is_empty())
+        .unwrap_or_else(|| vec!["text".to_string(), "image".to_string()]);
+      let is_default = entry
+        .get("isDefault")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+
+      Some(CodexModelOption {
+        id,
+        display_name,
+        input_modalities,
+        is_default
+      })
+    })
+    .collect::<Vec<_>>();
+
+  Ok(models)
+}
+
+#[tauri::command]
 fn codex_start_session(
   app: AppHandle,
   state: State<'_, AppState>,
@@ -897,6 +985,42 @@ fn codex_send_input(
   ) {
     emit_failed(&app, &runtime.thread_id, &error);
   }
+
+  Ok(())
+}
+
+#[tauri::command]
+fn codex_set_session_model(
+  app: AppHandle,
+  state: State<'_, AppState>,
+  input: CodexSessionModelInput
+) -> Result<(), String> {
+  let mut service = state
+    .codex
+    .lock()
+    .map_err(|_| "session state was poisoned".to_string())?;
+  let sessions = service.sessions.clone();
+  if service.client.is_none() {
+    service.client = Some(CodexAppServer::spawn(&app, sessions.clone())?);
+  }
+  let client = service
+    .client
+    .as_ref()
+    .ok_or_else(|| "failed to initialize codex app-server".to_string())?;
+  let sessions = sessions
+    .lock()
+    .map_err(|_| "session state was poisoned".to_string())?;
+  let Some(runtime) = sessions.get(&input.session_id) else {
+    return Err("unknown session id".to_string());
+  };
+
+  client.send_request(
+    "thread/resume",
+    json!({
+      "threadId": runtime.thread_id,
+      "model": input.model
+    })
+  )?;
 
   Ok(())
 }
@@ -1029,7 +1153,9 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       set_tray_state,
       reveal_main_window,
+      codex_list_models,
       codex_start_session,
+      codex_set_session_model,
       codex_send_input,
       codex_interrupt_session,
       codex_dispose_session

@@ -2,6 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { SessionRunner } from "../../session/runner";
 import type {
+  SessionModelOption,
+  SessionModelSelection,
   SendSessionInput,
   SessionEvent,
   SessionHandle,
@@ -44,6 +46,19 @@ export class CodexRunner implements SessionRunner {
     return {
       sessionId: result.sessionId
     };
+  }
+
+  async listModels(): Promise<SessionModelOption[]> {
+    return invoke<SessionModelOption[]>("codex_list_models");
+  }
+
+  async setSessionModel(input: SessionModelSelection): Promise<void> {
+    await invoke("codex_set_session_model", {
+      input: {
+        sessionId: input.sessionId,
+        model: input.model
+      }
+    });
   }
 
   async sendInput(input: SendSessionInput): Promise<void> {

@@ -14,6 +14,7 @@ import {
 import type {
   PromptImageAttachment,
   Session,
+  SessionModelOption,
   Workspace
 } from "./lib/session/types";
 
@@ -24,7 +25,6 @@ const DEFAULT_SIDEBAR_WIDTH = 344;
 const MIN_SIDEBAR_WIDTH = 280;
 const MAX_SIDEBAR_WIDTH = 440;
 
-const modelOptions = ["gpt-5.3-codex", "gpt-5.2-codex"];
 const themeOptions = ["light", "dark"] as const;
 type ThemeMode = (typeof themeOptions)[number];
 
@@ -127,7 +127,8 @@ export default function App() {
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
   const [composerValue, setComposerValue] = useState("");
   const [composerAttachments, setComposerAttachments] = useState<PromptImageAttachment[]>([]);
-  const [selectedModel, setSelectedModel] = useState(modelOptions[0]);
+  const [availableModels, setAvailableModels] = useState<SessionModelOption[]>([]);
+  const [selectedModel, setSelectedModel] = useState("");
   const [theme, setTheme] = useState<ThemeMode>("dark");
   const [expandedSystemNoteGroups, setExpandedSystemNoteGroups] = useState<Set<string>>(
     () => new Set()
@@ -191,6 +192,42 @@ export default function App() {
 
     return () => {
       unsubscribe();
+    };
+  }, [runner]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadModels() {
+      try {
+        const models = await runner.listModels();
+        if (cancelled) {
+          return;
+        }
+
+        setAvailableModels(models);
+        if (models.length === 0) {
+          setSelectedModel("");
+          return;
+        }
+
+        setSelectedModel((current) =>
+          models.some((model) => model.id === current)
+            ? current
+            : (models.find((model) => model.isDefault)?.id ?? models[0].id)
+        );
+      } catch {
+        if (!cancelled) {
+          setAvailableModels([]);
+          setSelectedModel("");
+        }
+      }
+    }
+
+    void loadModels();
+
+    return () => {
+      cancelled = true;
     };
   }, [runner]);
 
@@ -287,6 +324,14 @@ export default function App() {
     });
   }, [selectedSession?.id, selectedSession?.activities.length]);
 
+  useEffect(() => {
+    if (!selectedSession) {
+      return;
+    }
+
+    setSelectedModel(selectedSession.model);
+  }, [selectedSession?.id, selectedSession?.model]);
+
   function startResize(event: ReactPointerEvent<HTMLButtonElement>) {
     dragOffsetRef.current = event.clientX - sidebarWidth;
     setIsResizing(true);
@@ -344,7 +389,7 @@ export default function App() {
       return;
     }
 
-    if (!selectedWorkspace) {
+    if (!selectedWorkspace || !selectedModel) {
       return;
     }
 
@@ -438,8 +483,32 @@ export default function App() {
     setIsThemeMenuOpen(false);
   }
 
+  async function handleModelSelection(nextModel: string) {
+    if (!selectedSession) {
+      setSelectedModel(nextModel);
+      return;
+    }
+
+    if (selectedSession.model === nextModel) {
+      setSelectedModel(nextModel);
+      return;
+    }
+
+    await runner.setSessionModel({
+      sessionId: selectedSession.id,
+      model: nextModel
+    });
+
+    dispatch({
+      type: "session.model-changed",
+      sessionId: selectedSession.id,
+      model: nextModel
+    });
+    setSelectedModel(nextModel);
+  }
+
   const composerDisabled =
-    !selectedWorkspace || selectedSession?.status === "running";
+    !selectedWorkspace || !selectedModel || selectedSession?.status === "running";
   const showComposer = state.workspaces.length > 0;
   const visibleActivities = selectedSession?.activities ?? [];
   const groupedActivities = groupActivities(visibleActivities);
@@ -732,13 +801,18 @@ export default function App() {
                 <span>Model</span>
                 <select
                   value={selectedModel}
-                  onChange={(event) => setSelectedModel(event.target.value)}
+                  disabled={availableModels.length === 0}
+                  onChange={(event) => void handleModelSelection(event.target.value)}
                 >
-                  {modelOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
+                  {availableModels.length === 0 ? (
+                    <option value="">No models available</option>
+                  ) : (
+                    availableModels.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.displayName}
+                      </option>
+                    ))
+                  )}
                 </select>
               </label>
             </div>

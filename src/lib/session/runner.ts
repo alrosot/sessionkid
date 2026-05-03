@@ -2,11 +2,13 @@ import type {
   SendSessionInput,
   SessionEvent,
   SessionHandle,
+  SessionModelSelection,
   StartSessionInput
 } from "./types";
 
 export interface SessionRunner {
   startSession(input: StartSessionInput): Promise<SessionHandle>;
+  setSessionModel(input: SessionModelSelection): Promise<void>;
   sendInput(input: SendSessionInput): Promise<void>;
   interrupt(sessionId: string): Promise<void>;
   resume(sessionId: string): Promise<void>;

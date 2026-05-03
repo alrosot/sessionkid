@@ -13,6 +13,7 @@ export type SessionAppAction =
   | { type: "workspace.selected"; workspaceId: string }
   | { type: "workspace.new-session"; workspaceId: string }
   | { type: "session.selected"; sessionId: string }
+  | { type: "session.model-changed"; sessionId: string; model: string }
   | { type: "runner.event"; event: SessionEvent };
 
 export const emptySessionAppState: SessionAppState = {
@@ -208,6 +209,14 @@ export function sessionAppReducer(
         selectedSessionId: session.id
       };
     }
+    case "session.model-changed":
+      return {
+        ...state,
+        sessions: patchSession(state.sessions, action.sessionId, (session) => ({
+          ...session,
+          model: action.model
+        }))
+      };
     case "runner.event": {
       const { event } = action;
 

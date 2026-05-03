@@ -22,6 +22,13 @@ export type PromptImageAttachment = {
   previewUrl: string;
 };
 
+export type SessionModelOption = {
+  id: string;
+  displayName: string;
+  inputModalities: string[];
+  isDefault: boolean;
+};
+
 export type SessionActivityKind =
   | "user-message"
   | "assistant-update"
@@ -57,6 +64,11 @@ export type StartSessionInput = {
 
 export type SessionHandle = {
   sessionId: string;
+};
+
+export type SessionModelSelection = {
+  sessionId: string;
+  model: string;
 };
 
 export type SendSessionInput = {
