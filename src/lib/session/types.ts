@@ -69,11 +69,14 @@ export type SessionHandle = {
 export type SessionModelSelection = {
   sessionId: string;
   model: string;
+  workspacePath: string;
 };
 
 export type SendSessionInput = {
   sessionId: string;
   input: string;
+  model: string;
+  workspacePath: string;
   attachments?: PromptImageAttachment[];
 };
 

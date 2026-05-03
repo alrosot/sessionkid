@@ -56,7 +56,8 @@ export class CodexRunner implements SessionRunner {
     await invoke("codex_set_session_model", {
       input: {
         sessionId: input.sessionId,
-        model: input.model
+        model: input.model,
+        workspacePath: input.workspacePath
       }
     });
   }
@@ -66,6 +67,8 @@ export class CodexRunner implements SessionRunner {
       input: {
         sessionId: input.sessionId,
         input: input.input,
+        model: input.model,
+        workspacePath: input.workspacePath,
         attachments: input.attachments ?? []
       }
     });
@@ -82,7 +85,9 @@ export class CodexRunner implements SessionRunner {
   async resume(sessionId: string): Promise<void> {
     await this.sendInput({
       sessionId,
-      input: "Resume the previous task."
+      input: "Resume the previous task.",
+      model: "",
+      workspacePath: ""
     });
   }
 

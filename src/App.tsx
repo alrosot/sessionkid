@@ -134,6 +134,7 @@ export default function App() {
     () => new Set()
   );
   const [state, dispatch] = useReducer(sessionAppReducer, emptySessionAppState);
+  const [hasHydratedState, setHasHydratedState] = useState(false);
   const composerAttachmentsRef = useRef<PromptImageAttachment[]>([]);
   const dragOffsetRef = useRef(0);
   const feedRef = useRef<HTMLElement | null>(null);
@@ -158,6 +159,7 @@ export default function App() {
       type: "hydrate",
       state: parseStoredSessionAppState(window.localStorage.getItem(SESSION_STATE_KEY))
     });
+    setHasHydratedState(true);
   }, []);
 
   useEffect(() => {
@@ -170,8 +172,12 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
+    if (!hasHydratedState) {
+      return;
+    }
+
     window.localStorage.setItem(SESSION_STATE_KEY, JSON.stringify(state));
-  }, [state]);
+  }, [hasHydratedState, state]);
 
   useEffect(() => {
     composerAttachmentsRef.current = composerAttachments;
@@ -375,10 +381,12 @@ export default function App() {
       return;
     }
 
-    if (selectedSession) {
+    if (selectedSession && selectedWorkspace) {
       await runner.sendInput({
         sessionId: selectedSession.id,
         input: prompt,
+        model: selectedSession.model,
+        workspacePath: selectedWorkspace.path,
         attachments: composerAttachments
       });
       setComposerValue("");
@@ -496,7 +504,8 @@ export default function App() {
 
     await runner.setSessionModel({
       sessionId: selectedSession.id,
-      model: nextModel
+      model: nextModel,
+      workspacePath: selectedWorkspace?.path ?? ""
     });
 
     dispatch({

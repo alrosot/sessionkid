@@ -51,6 +51,8 @@ struct CodexStartSessionInput {
 struct CodexSessionInput {
   session_id: String,
   input: String,
+  model: String,
+  workspace_path: String,
   attachments: Vec<CodexImageAttachment>
 }
 
@@ -73,7 +75,8 @@ struct CodexSessionRef {
 #[serde(rename_all = "camelCase")]
 struct CodexSessionModelInput {
   session_id: String,
-  model: String
+  model: String,
+  workspace_path: String
 }
 
 #[derive(Debug, Serialize)]
@@ -661,6 +664,38 @@ fn build_turn_input(
   Ok(input)
 }
 
+fn ensure_session_runtime<'a>(
+  client: &CodexAppServer,
+  sessions: &'a mut HashMap<String, SessionRuntime>,
+  session_id: &str,
+  workspace_path: &str,
+  model: &str
+) -> Result<&'a mut SessionRuntime, String> {
+  if !sessions.contains_key(session_id) {
+    client.send_request(
+      "thread/resume",
+      json!({
+        "threadId": session_id,
+        "cwd": workspace_path,
+        "model": model
+      })
+    )?;
+
+    sessions.insert(
+      session_id.to_string(),
+      SessionRuntime {
+        thread_id: session_id.to_string(),
+        current_turn_id: None,
+        pending_user_input: None
+      }
+    );
+  }
+
+  sessions
+    .get_mut(session_id)
+    .ok_or_else(|| "unknown session id".to_string())
+}
+
 fn emit_event(app: &AppHandle, payload: Value) {
   let _ = app.emit(CODEX_EVENT_NAME, payload);
 }
@@ -949,9 +984,13 @@ fn codex_send_input(
   let mut sessions = sessions
     .lock()
     .map_err(|_| "session state was poisoned".to_string())?;
-  let Some(runtime) = sessions.get_mut(&input.session_id) else {
-    return Err("unknown session id".to_string());
-  };
+  let runtime = ensure_session_runtime(
+    client,
+    &mut sessions,
+    &input.session_id,
+    &input.workspace_path,
+    &input.model
+  )?;
 
   let answer_text = input.input.clone();
   emit_input_received(&app, &runtime.thread_id, &input.input, input.attachments.len());
@@ -1007,17 +1046,22 @@ fn codex_set_session_model(
     .client
     .as_ref()
     .ok_or_else(|| "failed to initialize codex app-server".to_string())?;
-  let sessions = sessions
+  let mut sessions = sessions
     .lock()
     .map_err(|_| "session state was poisoned".to_string())?;
-  let Some(runtime) = sessions.get(&input.session_id) else {
-    return Err("unknown session id".to_string());
-  };
+  let runtime = ensure_session_runtime(
+    client,
+    &mut sessions,
+    &input.session_id,
+    &input.workspace_path,
+    &input.model
+  )?;
 
   client.send_request(
     "thread/resume",
     json!({
       "threadId": runtime.thread_id,
+      "cwd": input.workspace_path,
       "model": input.model
     })
   )?;
