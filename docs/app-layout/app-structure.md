@@ -23,11 +23,11 @@ Wireframe spec: [wireframe-spec.md](/Users/arosot/code/sessionkid/docs/app-layou
    - Purpose: Let the user browse workspaces and select a session within each workspace
    - Key actions: Add a workspace, select a workspace, create a new session for a workspace, switch active session
 2. Session View
-   - Purpose: Show the currently selected session title, related project context, and chronological activity
+   - Purpose: Show the currently selected session title, project context, and chronological activity
    - Key actions: Read updates, inspect edited files, review progress notes, expand collapsed system notes, keep context on the active task
 3. Composer Area
    - Purpose: Capture the next user instruction or follow-up prompt inside the active session
-   - Key actions: Type a message, choose model, submit input with keyboard shortcut, interrupt a running session
+   - Key actions: Type a message, paste images, choose model, submit input with keyboard shortcut, interrupt a running session
 
 ## Layout Regions
 
@@ -44,16 +44,15 @@ Wireframe spec: [wireframe-spec.md](/Users/arosot/code/sessionkid/docs/app-layou
    - Active session title
    - Workspace path as a compact context label
 4. Activity Feed
-   - User prompt bubble near the top of the conversation
+   - User prompt rows in chronological order
    - Assistant progress updates in chronological order
    - Structured activity rows for explored or edited files
    - Collapsible grouped system-note blocks
    - Markdown rendering for tables, lists, inline code, and fenced blocks in user/assistant content
 5. Bottom Composer
    - Large text input anchored to the bottom
-   - Left-side utility/action button
+   - Model selector
    - Interrupt action while a session is running
-   - Model selector near the bottom-right
    - Message send is keyboard-first via `Command+Enter`
 6. Tray/Menu Bar Presence
    - Persistent tray icon while the app is running
@@ -63,8 +62,8 @@ Wireframe spec: [wireframe-spec.md](/Users/arosot/code/sessionkid/docs/app-layou
 
 ## Data And State Boundaries
 
-- Local app state: Sidebar width, selected workspace, selected session, current draft input, expanded system-note groups, tray icon state
-- Persisted user data: Workspace list, session metadata, activity history, selected workspace/session, sidebar width
+- Local app state: Selected workspace, selected session, current draft input, expanded system-note groups, tray icon state
+- Persisted user data: Workspace list, session metadata, activity history, selected workspace/session
 - Temporary session data: In-flight assistant status, Codex turn lifecycle, pending user-input request ids, transient loading states
 
 ## Session Status Model
@@ -88,6 +87,7 @@ Wireframe spec: [wireframe-spec.md](/Users/arosot/code/sessionkid/docs/app-layou
 2. Main recurring workflow: Select a workspace, start or reopen a session, review prior activity, then continue the same session in the composer
 3. Attention recovery workflow: Notice a tray icon state change, reopen the app, select the waiting session, and provide the requested input
 4. Session authoring workflow: Use the workspace-level `+` button to begin a new session without losing the workspace context
+5. Resume workflow: Reopen the app and continue a previously saved session using its persisted local state and Codex thread id
 
 ## Window/Layout Rules
 

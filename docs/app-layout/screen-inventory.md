@@ -39,8 +39,8 @@ Wireframe spec: [wireframe-spec.md](/Users/arosot/code/sessionkid/docs/app-layou
 ### Session Header
 
 - Purpose: Establish context for the active session at the top of the main pane
-- Primary user actions: Confirm the active session, inspect the workspace path, access future session actions
-- Required data: Session title, workspace path label, optional action affordances
+- Primary user actions: Confirm the active session and inspect its workspace context
+- Required data: Session title, workspace context label
 - Empty state: If no session is selected, replace the header with a neutral placeholder title
 - Error state: Keep the title area rendered even if the feed fails below it
 - Notes: The header should stay visually lightweight so the conversation remains the primary focus
@@ -49,7 +49,7 @@ Wireframe spec: [wireframe-spec.md](/Users/arosot/code/sessionkid/docs/app-layou
 
 - Purpose: Present the running conversation and system activity for the active session
 - Primary user actions: Read prompts and responses, scan progress notes, review structured file actions, expand collapsed system notes
-- Required data: Ordered messages, activity event type, timestamps or elapsed-time labels, file names, status indicators
+- Required data: Ordered messages, activity event type, file names, status indicators
 - Empty state: Show a prompt to begin the first instruction in the current session
 - Error state: Render prior cached activity if possible and isolate failures to the affected message block
 - Notes: Feed items can mix freeform assistant text with structured rows such as explored files or edited files. User and assistant content should render markdown-style formatting. Consecutive system-note entries should be grouped into one collapsed block by default.
@@ -57,8 +57,8 @@ Wireframe spec: [wireframe-spec.md](/Users/arosot/code/sessionkid/docs/app-layou
 ### Composer
 
 - Purpose: Let the user continue the active session from the bottom of the screen
-- Primary user actions: Enter a prompt, choose a model, submit the message with `Command+Enter`, interrupt a running session
-- Required data: Draft text, model selection, disabled/loading state, selected session status
+- Primary user actions: Enter a prompt, paste images, choose a model, submit the message with `Command+Enter`, interrupt a running session
+- Required data: Draft text, image attachments, model selection, disabled/loading state, selected session status
 - Empty state: Show instructional placeholder text in the input
 - Error state: Preserve the draft and surface send failures inline
 - Notes: The composer is docked to the bottom of the main pane and should remain reachable while the feed scrolls. A separate send button is not required in the current implementation.

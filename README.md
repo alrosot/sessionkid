@@ -2,22 +2,28 @@
 
 Session Kid is a macOS desktop app for monitoring and managing agent coding sessions. It is built with Tauri 2.0 and React.
 
-## What exists now
+## Current state
 
-- A Tauri 2 scaffold under `src-tauri/`
-- A React + Vite frontend under `src/`
-- A Codex-first desktop shell with:
-  - resizable left sidebar
-  - nested workspace and session navigation
-  - independently scrollable right pane
-  - local workspace picker
-  - persisted workspace/session shell state
-  - markdown-rendered activity feed
-  - grouped/collapsed system notes
-  - `Command+Enter` composer submission
-  - Codex execution through local `codex app-server`
-  - hide-to-tray window close behavior
-  - tray state updates and waiting-for-input notifications
+- Codex-first execution through local `codex app-server`
+- Workspace-based session management
+- Persistent local session state across app relaunches
+- Resizable sidebar with nested workspace and session navigation
+- Independently scrollable session pane
+- Markdown-rendered activity feed
+- Grouped and collapsible system notes
+- Keyboard-first composer with `Command+Enter` submission
+- Image paste support in prompts
+- Model discovery from Codex
+- Theme selection
+- Hide-to-tray close behavior, tray state updates, and waiting-for-input notifications
+
+## Tech stack
+
+- Tauri 2.0
+- React
+- Vite
+- Rust
+- Codex App Server
 
 ## Source of truth
 
@@ -28,22 +34,38 @@ Product and layout decisions still live in `docs/`:
 - `docs/app-layout/screen-inventory.md`
 - `docs/app-layout/wireframe-spec.md`
 
+## Requirements
+
+- macOS
+- Rust toolchain
+- Node.js / npm
+- Codex CLI installed locally
+
 ## Local development
 
-Install the JavaScript dependencies:
+Install dependencies:
 
 ```bash
 npm install
 ```
 
-Install Rust if it is not already available, then start the app:
+Then run the app:
 
 ```bash
 npm run tauri dev
+```
+
+## Persistence
+
+- Session state is stored locally on disk by the app.
+- On macOS, the current path is:
+
+```bash
+~/Library/Application Support/com.sessionkid.app/session-state.json
 ```
 
 ## Notes
 
 - There are no seeded workspaces or sessions on first run.
 - Codex is the only execution provider implemented right now.
-- The current Codex transport is integrated, but still early enough that more runtime validation and approval UX work is expected.
+- Session continuity depends on persisted local state plus Codex thread resume.

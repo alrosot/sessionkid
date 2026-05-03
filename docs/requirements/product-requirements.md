@@ -22,7 +22,7 @@
 
 - Startable Tauri app on macOS
 - React-based main split-pane layout with sidebar, session view, composer, and tray presence
-- Local workspace picker and persisted workspace/session shell state
+- Local workspace picker and persisted workspace/session state
 - Codex-first session execution using `codex app-server`
 - Session activity feed with markdown rendering for assistant/user content
 - Empty first-run shell with no seeded workspaces or sessions
@@ -30,7 +30,6 @@
 ## Out Of Scope For First Version
 
 - Multi-provider execution support beyond Codex
-- Production-grade persistence or migration strategy
 - Rich approval UI beyond the current waiting-for-input flow
 - Settings, authentication management, and advanced workspace configuration
 
@@ -56,7 +55,7 @@
 - Frontend stack: React
 - Performance expectations: Desktop shell should feel immediate, with the right pane staying readable and independently scrollable even with a long activity feed
 - Offline/online expectations: Workspace browsing should work locally; Codex execution depends on the local Codex CLI and its upstream service availability
-- Privacy/security expectations: Workspaces are local directories selected by the user; current shell persists workspace and session metadata locally and delegates execution to local Codex tooling
+- Privacy/security expectations: Workspaces are local directories selected by the user; the app persists workspace and session state locally and delegates execution to local Codex tooling
 - Background behavior: Tray presence and status updates should remain reliable while the app is open or backgrounded
 - Window-close behavior: Closing the main window hides the app to the tray instead of quitting
 - Tray status behavior: The tray should show aggregate state only, not per-session counts
@@ -72,10 +71,9 @@
 
 - The current Codex transport is compile-verified but still early in real-runtime validation against diverse session flows
 - Approval and waiting-for-input UX is intentionally narrow and may need a richer surface once more Codex request types are handled
-- Local-storage persistence is sufficient for the scaffold stage but not yet a durable product persistence model
+- Long-term persistence format and migration strategy are still intentionally simple
 
 ## Open Questions
 
-- When should workspace/session persistence move from local storage to an application-owned store?
 - How much of the Codex approval model should be exposed inline versus through separate UI surfaces?
 - When multi-provider support arrives, which provider-neutral event fields belong in the shared session model versus provider adapters?
