@@ -20,6 +20,7 @@ Reference image: [main-screen.png](/Users/arosot/code/sessionkid/docs/app-layout
 - Left pane: Resizable sidebar for workspace and session navigation
 - Right pane: Flexible main work area for session activity and input
 - Space allocation rule: After the left pane reaches its current width, all remaining horizontal space belongs to the right pane
+- Scroll rule: The shell should avoid whole-window scrolling; the right pane owns the main scrollable region for session history
 
 ## Left Pane Sizing
 
@@ -32,9 +33,11 @@ Reference image: [main-screen.png](/Users/arosot/code/sessionkid/docs/app-layout
 
 ## Left Pane Content Rules
 
-- Workspace rows: Show icon plus workspace name without clipping under normal default sizing
+- Workspace rows: Show workspace name without clipping under normal default sizing
+- Workspace rows: Include a compact `+` action for starting a new session in that workspace
+- Workspace rows: Do not show the full filesystem path in the sidebar list
 - Session rows: Show the session title or summary on a single line with truncation after roughly 40 visible characters at default width
-- Timestamps: Right-aligned and subordinate to the session summary
+- Status markers: Session rows can use compact status dots or equivalent visual state indicators
 - Expansion behavior: Workspace groups can collapse and expand without changing the overall shell structure
 
 ## Right Pane Sizing
@@ -49,6 +52,7 @@ Reference image: [main-screen.png](/Users/arosot/code/sessionkid/docs/app-layout
 - Main header: Single-row context area above the activity feed
 - Activity feed: Primary flexible vertical region
 - Composer: Docked at the bottom with a stable height that can grow modestly with multi-line input
+- Composer submission: Support keyboard-first submission with `Command+Enter`
 
 ## Spacing And Density
 
@@ -62,3 +66,5 @@ Reference image: [main-screen.png](/Users/arosot/code/sessionkid/docs/app-layout
 - Treat the screenshot as visual guidance for tone and proportions, not literal pixel truth
 - Validate sidebar width against the actual font, row height, and timestamp formatting used in the app
 - If the real content model needs more than one line in the sidebar, revisit the 40-character target instead of letting the default pane width drift arbitrarily
+- The active session feed should support markdown-style content rendering for user and assistant text
+- Consecutive system-note activity should collapse into a single folded block by default to reduce visual noise

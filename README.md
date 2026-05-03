@@ -1,15 +1,49 @@
-# sessionkid
+# Session Kid
 
-Planning workspace for a macOS app that will be built with Tauri 2.0.
+Session Kid is a macOS desktop app for monitoring and managing agent coding sessions. It is built with Tauri 2.0 and React.
 
-## Current structure
+## What exists now
 
-- `docs/requirements/`: product, feature, and constraint notes
-- `docs/app-layout/`: app information architecture and screen layout notes
+- A Tauri 2 scaffold under `src-tauri/`
+- A React + Vite frontend under `src/`
+- A Codex-first desktop shell with:
+  - resizable left sidebar
+  - nested workspace and session navigation
+  - independently scrollable right pane
+  - local workspace picker
+  - persisted workspace/session shell state
+  - markdown-rendered activity feed
+  - grouped/collapsed system notes
+  - `Command+Enter` composer submission
+  - Codex execution through local `codex app-server`
+  - hide-to-tray window close behavior
+  - tray state updates and waiting-for-input notifications
 
-## Suggested workflow
+## Source of truth
 
-1. Capture product goals and constraints in `docs/requirements/product-requirements.md`.
-2. Define screens and navigation in `docs/app-layout/app-structure.md`.
-3. Add wireframe-level details in `docs/app-layout/screen-inventory.md`.
-4. Scaffold the Tauri app once the first pass of the above is stable.
+Product and layout decisions still live in `docs/`:
+
+- `docs/requirements/product-requirements.md`
+- `docs/app-layout/app-structure.md`
+- `docs/app-layout/screen-inventory.md`
+- `docs/app-layout/wireframe-spec.md`
+
+## Local development
+
+Install the JavaScript dependencies:
+
+```bash
+npm install
+```
+
+Install Rust if it is not already available, then start the app:
+
+```bash
+npm run tauri dev
+```
+
+## Notes
+
+- There are no seeded workspaces or sessions on first run.
+- Codex is the only execution provider implemented right now.
+- The current Codex transport is integrated, but still early enough that more runtime validation and approval UX work is expected.

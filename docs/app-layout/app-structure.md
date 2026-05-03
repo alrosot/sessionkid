@@ -15,19 +15,19 @@ Wireframe spec: [wireframe-spec.md](/Users/arosot/code/sessionkid/docs/app-layou
 
 - Primary navigation pattern: Two-pane split layout with a persistent left sidebar and a main content pane
 - Secondary navigation pattern: Hierarchical list navigation inside the sidebar
-- Deep-linking needs: Direct selection of a workspace and session from local app state or URL-like route state
+- Deep-linking needs: Direct selection of a workspace and session from local app state; URL-style routing is not required yet
 
 ## Top-Level Sections
 
 1. Workspace Sidebar
    - Purpose: Let the user browse workspaces and select a session within each workspace
-   - Key actions: Expand workspace groups, switch active session, create a new session, view relative recency
+   - Key actions: Add a workspace, select a workspace, create a new session for a workspace, switch active session
 2. Session View
    - Purpose: Show the currently selected session title, related project context, and chronological activity
-   - Key actions: Read updates, inspect edited files, review progress notes, keep context on the active task
+   - Key actions: Read updates, inspect edited files, review progress notes, expand collapsed system notes, keep context on the active task
 3. Composer Area
    - Purpose: Capture the next user instruction or follow-up prompt inside the active session
-   - Key actions: Type a message, attach context later, choose model, submit input
+   - Key actions: Type a message, choose model, submit input with keyboard shortcut, interrupt a running session
 
 ## Layout Regions
 
@@ -37,33 +37,35 @@ Wireframe spec: [wireframe-spec.md](/Users/arosot/code/sessionkid/docs/app-layou
 2. Left Sidebar
    - Resizable by the user
    - Defaults to the minimum comfortable width needed for workspace names and an approximately 40-character one-line session summary
-   - Workspace heading and add button
-   - Workspace group rows with icon and label
-   - Indented session rows under each workspace
-   - Relative timestamps aligned on the right for recent items
+   - Workspace heading and add-workspace button
+   - Workspace rows with name and per-workspace new-session `+` button
+   - Nested session rows under each workspace
 3. Main Header
    - Active session title
-   - Small project/repository context label
+   - Workspace path as a compact context label
 4. Activity Feed
    - User prompt bubble near the top of the conversation
    - Assistant progress updates in chronological order
    - Structured activity rows for explored or edited files
+   - Collapsible grouped system-note blocks
+   - Markdown rendering for tables, lists, inline code, and fenced blocks in user/assistant content
 5. Bottom Composer
    - Large text input anchored to the bottom
    - Left-side utility/action button
-   - Model selector near the bottom-left
-   - Primary send button on the bottom-right
+   - Interrupt action while a session is running
+   - Model selector near the bottom-right
+   - Message send is keyboard-first via `Command+Enter`
 6. Tray/Menu Bar Presence
    - Persistent tray icon while the app is running
    - Visual state changes based on aggregate session status
    - Highlighted state when any session is waiting for user input
-   - Quick actions for opening the app and jumping to attention-needed sessions
+   - Minimal current actions for reopening the app and quitting
 
 ## Data And State Boundaries
 
-- Local app state: Sidebar expansion state, selected workspace, selected session, current draft input, scroll position, tray icon state
-- Persisted user data: Workspace list, session metadata, message history, file activity summaries, UI preferences
-- Temporary session data: In-flight assistant status, partial streamed output, transient loading states, per-session attention flags
+- Local app state: Sidebar width, selected workspace, selected session, current draft input, expanded system-note groups, tray icon state
+- Persisted user data: Workspace list, session metadata, activity history, selected workspace/session, sidebar width
+- Temporary session data: In-flight assistant status, Codex turn lifecycle, pending user-input request ids, transient loading states
 
 ## Session Status Model
 
@@ -78,27 +80,28 @@ Wireframe spec: [wireframe-spec.md](/Users/arosot/code/sessionkid/docs/app-layou
 - Busy state: Distinct active state when one or more sessions are running
 - Attention state: Stronger highlighted state when any session is waiting for user input
 - Error state: Distinct warning state when any session has failed
-- Interaction model: Clicking the tray icon opens the app and can focus the highest-priority session needing attention
+- Interaction model: Clicking the tray icon reopens the app; deeper attention-targeting is not implemented yet
 
 ## Key Flows
 
-1. First launch: Open the main split view with an empty or seeded workspace list and an obvious path to start a session
-2. Main recurring workflow: Select a workspace, choose a session, review prior activity, then continue the conversation in the composer
-3. Attention recovery workflow: Notice a tray icon state change, reopen the app, jump to the waiting session, and provide the requested input
-4. Settings/configuration: Access app preferences for model defaults, appearance, notification behavior, and workspace-level behavior without disrupting the main session view
+1. First launch: Open the main split view with an empty workspace list and an obvious path to add the first workspace
+2. Main recurring workflow: Select a workspace, start or reopen a session, review prior activity, then continue the same session in the composer
+3. Attention recovery workflow: Notice a tray icon state change, reopen the app, select the waiting session, and provide the requested input
+4. Session authoring workflow: Use the workspace-level `+` button to begin a new session without losing the workspace context
 
 ## Window/Layout Rules
 
 - Minimum window size: Sized for a readable two-pane desktop layout with a persistent sidebar
 - Resizable: Yes
 - Multi-window support: Not required initially
-- Close behavior: User-configurable, with support for keeping the app available via the tray after the window is closed
+- Close behavior: Closing the main window hides the app to the tray instead of quitting
 - Modal usage: Reserve for destructive confirmations, settings, or focused secondary tasks
 - Pane resizing: The left sidebar is user-resizable and the right pane consumes all remaining width
+- Scroll behavior: The right pane owns the main scrollable region; the sidebar should remain visually stable while browsing activity
 
 ## Design Constraints
 
-- Visual tone: Dark, focused, desktop-native, calm, and work-oriented
+- Visual tone: Modern, calm, desktop-native, and close to macOS standards where practical
 - Density: Medium density with compact lists and generous reading space in the main pane
 - Accessibility expectations: Strong contrast, keyboard navigation, visible focus states, and readable typography at desktop sizes
 
