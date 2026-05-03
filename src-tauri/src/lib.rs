@@ -3,7 +3,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
   collections::HashMap,
+  fs,
   io::{BufRead, BufReader, Write},
+  path::PathBuf,
   process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio},
   sync::{
     atomic::{AtomicU64, Ordering},
@@ -40,14 +42,25 @@ struct CodexStartSessionInput {
   workspace_id: String,
   workspace_path: String,
   prompt: String,
-  model: String
+  model: String,
+  attachments: Vec<CodexImageAttachment>
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct CodexSessionInput {
   session_id: String,
-  input: String
+  input: String,
+  attachments: Vec<CodexImageAttachment>
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CodexImageAttachment {
+  id: String,
+  name: String,
+  mime_type: String,
+  bytes: Vec<u8>
 }
 
 #[derive(Debug, Deserialize)]
@@ -547,11 +560,98 @@ fn activity(kind: &str, text: &str) -> Value {
   })
 }
 
+fn describe_user_input(text: &str, attachment_count: usize) -> String {
+  let trimmed = text.trim();
+  let attachment_text = match attachment_count {
+    0 => None,
+    1 => Some("[Attached 1 image]".to_string()),
+    count => Some(format!("[Attached {count} images]"))
+  };
+
+  match (trimmed.is_empty(), attachment_text) {
+    (false, Some(attachment_text)) => format!("{trimmed}\n\n{attachment_text}"),
+    (false, None) => trimmed.to_string(),
+    (true, Some(attachment_text)) => attachment_text,
+    (true, None) => String::new()
+  }
+}
+
+fn default_session_prompt(text: &str, attachment_count: usize) -> String {
+  let trimmed = text.trim();
+  if !trimmed.is_empty() {
+    return trimmed.to_string();
+  }
+
+  match attachment_count {
+    0 => "New session".to_string(),
+    1 => "Image prompt".to_string(),
+    count => format!("{count} image prompt")
+  }
+}
+
+fn image_extension(mime_type: &str) -> &'static str {
+  match mime_type {
+    "image/png" => "png",
+    "image/jpeg" => "jpg",
+    "image/webp" => "webp",
+    "image/gif" => "gif",
+    "image/heic" => "heic",
+    "image/heif" => "heif",
+    _ => "img"
+  }
+}
+
+fn write_attachment_to_temp(attachment: &CodexImageAttachment) -> Result<PathBuf, String> {
+  let extension = image_extension(&attachment.mime_type);
+  let path = std::env::temp_dir().join(format!(
+    "session-kid-{}-{}.{}",
+    Utc::now().timestamp_millis(),
+    attachment.id,
+    extension
+  ));
+
+  fs::write(&path, &attachment.bytes)
+    .map_err(|error| format!("failed to write attachment {}: {error}", attachment.name))?;
+
+  Ok(path)
+}
+
+fn build_turn_input(
+  text: &str,
+  attachments: &[CodexImageAttachment]
+) -> Result<Vec<Value>, String> {
+  let mut input = Vec::new();
+
+  for attachment in attachments {
+    let path = write_attachment_to_temp(attachment)?;
+    input.push(json!({
+      "type": "localImage",
+      "path": path
+    }));
+  }
+
+  if !text.trim().is_empty() {
+    input.push(json!({
+      "type": "text",
+      "text": text,
+      "text_elements": []
+    }));
+  }
+
+  if input.is_empty() {
+    return Err("empty prompt".to_string());
+  }
+
+  Ok(input)
+}
+
 fn emit_event(app: &AppHandle, payload: Value) {
   let _ = app.emit(CODEX_EVENT_NAME, payload);
 }
 
 fn emit_started(app: &AppHandle, input: &CodexStartSessionInput, session_id: &str) {
+  let prompt = default_session_prompt(&input.prompt, input.attachments.len());
+  let activity_text = describe_user_input(&input.prompt, input.attachments.len());
   emit_event(
     app,
     json!({
@@ -560,13 +660,13 @@ fn emit_started(app: &AppHandle, input: &CodexStartSessionInput, session_id: &st
         "id": session_id,
         "workspaceId": input.workspace_id,
         "provider": "codex",
-        "title": input.prompt,
-        "summary": input.prompt,
+        "title": prompt,
+        "summary": prompt,
         "model": input.model,
         "status": "running",
         "createdAt": timestamp(),
         "updatedAt": timestamp(),
-        "activities": [activity("user-message", &input.prompt)]
+        "activities": [activity("user-message", &activity_text)]
       }
     })
   );
@@ -583,13 +683,19 @@ fn emit_progress(app: &AppHandle, session_id: &str, kind: &str, text: &str) {
   );
 }
 
-fn emit_input_received(app: &AppHandle, session_id: &str, text: &str) {
+fn emit_input_received(
+  app: &AppHandle,
+  session_id: &str,
+  text: &str,
+  attachment_count: usize
+) {
+  let activity_text = describe_user_input(text, attachment_count);
   emit_event(
     app,
     json!({
       "type": "session.input_received",
       "sessionId": session_id,
-      "activity": activity("user-message", text)
+      "activity": activity("user-message", &activity_text)
     })
   );
 }
@@ -725,11 +831,7 @@ fn codex_start_session(
     "turn/start",
     json!({
       "threadId": thread_id,
-      "input": [{
-        "type": "text",
-        "text": input.prompt,
-        "text_elements": []
-      }]
+      "input": build_turn_input(&input.prompt, &input.attachments)?
     })
   ) {
     emit_failed(&app, &thread_id, &error);
@@ -764,7 +866,7 @@ fn codex_send_input(
   };
 
   let answer_text = input.input.clone();
-  emit_input_received(&app, &runtime.thread_id, &input.input);
+  emit_input_received(&app, &runtime.thread_id, &input.input, input.attachments.len());
 
   if let Some(pending) = runtime.pending_user_input.take() {
     let answers = pending
@@ -790,11 +892,7 @@ fn codex_send_input(
     "turn/start",
     json!({
       "threadId": runtime.thread_id,
-      "input": [{
-        "type": "text",
-        "text": input.input,
-        "text_elements": []
-      }]
+      "input": build_turn_input(&input.input, &input.attachments)?
     })
   ) {
     emit_failed(&app, &runtime.thread_id, &error);

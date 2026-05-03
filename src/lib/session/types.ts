@@ -14,6 +14,14 @@ export type Workspace = {
   path: string;
 };
 
+export type PromptImageAttachment = {
+  id: string;
+  name: string;
+  mimeType: string;
+  bytes: number[];
+  previewUrl: string;
+};
+
 export type SessionActivityKind =
   | "user-message"
   | "assistant-update"
@@ -44,10 +52,17 @@ export type StartSessionInput = {
   workspace: Workspace;
   prompt: string;
   model: string;
+  attachments?: PromptImageAttachment[];
 };
 
 export type SessionHandle = {
   sessionId: string;
+};
+
+export type SendSessionInput = {
+  sessionId: string;
+  input: string;
+  attachments?: PromptImageAttachment[];
 };
 
 export type SessionEvent =

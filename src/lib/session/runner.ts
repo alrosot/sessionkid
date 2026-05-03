@@ -1,4 +1,5 @@
 import type {
+  SendSessionInput,
   SessionEvent,
   SessionHandle,
   StartSessionInput
@@ -6,7 +7,7 @@ import type {
 
 export interface SessionRunner {
   startSession(input: StartSessionInput): Promise<SessionHandle>;
-  sendInput(sessionId: string, input: string): Promise<void>;
+  sendInput(input: SendSessionInput): Promise<void>;
   interrupt(sessionId: string): Promise<void>;
   resume(sessionId: string): Promise<void>;
   dispose(sessionId: string): Promise<void>;

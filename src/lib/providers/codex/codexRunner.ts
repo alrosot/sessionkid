@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { SessionRunner } from "../../session/runner";
 import type {
+  SendSessionInput,
   SessionEvent,
   SessionHandle,
   StartSessionInput
@@ -35,7 +36,8 @@ export class CodexRunner implements SessionRunner {
         workspaceId: input.workspace.id,
         workspacePath: input.workspace.path,
         prompt: input.prompt,
-        model: input.model
+        model: input.model,
+        attachments: input.attachments ?? []
       }
     });
 
@@ -44,11 +46,12 @@ export class CodexRunner implements SessionRunner {
     };
   }
 
-  async sendInput(sessionId: string, input: string): Promise<void> {
+  async sendInput(input: SendSessionInput): Promise<void> {
     await invoke("codex_send_input", {
       input: {
-        sessionId,
-        input
+        sessionId: input.sessionId,
+        input: input.input,
+        attachments: input.attachments ?? []
       }
     });
   }
@@ -62,7 +65,10 @@ export class CodexRunner implements SessionRunner {
   }
 
   async resume(sessionId: string): Promise<void> {
-    await this.sendInput(sessionId, "Resume the previous task.");
+    await this.sendInput({
+      sessionId,
+      input: "Resume the previous task."
+    });
   }
 
   async dispose(sessionId: string): Promise<void> {

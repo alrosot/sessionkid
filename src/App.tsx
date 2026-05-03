@@ -11,7 +11,11 @@ import {
   parseStoredSessionAppState,
   sessionAppReducer
 } from "./lib/session/store";
-import type { Session, Workspace } from "./lib/session/types";
+import type {
+  PromptImageAttachment,
+  Session,
+  Workspace
+} from "./lib/session/types";
 
 const SIDEBAR_KEY = "session-kid.sidebar-width";
 const SESSION_STATE_KEY = "session-kid.session-state";
@@ -72,6 +76,17 @@ function formatSessionMeta(session: Session) {
   return `${formatSessionCreatedAt(session.createdAt)} · ${messageLabel}`;
 }
 
+async function readImageAttachment(file: File): Promise<PromptImageAttachment> {
+  const buffer = await file.arrayBuffer();
+  return {
+    id: crypto.randomUUID(),
+    name: file.name || "pasted-image.png",
+    mimeType: file.type || "image/png",
+    bytes: Array.from(new Uint8Array(buffer)),
+    previewUrl: URL.createObjectURL(file)
+  };
+}
+
 function summarizeSystemNote(text: string) {
   return text.trim().replace(/\s+/g, " ");
 }
@@ -111,12 +126,14 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
   const [composerValue, setComposerValue] = useState("");
+  const [composerAttachments, setComposerAttachments] = useState<PromptImageAttachment[]>([]);
   const [selectedModel, setSelectedModel] = useState(modelOptions[0]);
   const [theme, setTheme] = useState<ThemeMode>("dark");
   const [expandedSystemNoteGroups, setExpandedSystemNoteGroups] = useState<Set<string>>(
     () => new Set()
   );
   const [state, dispatch] = useReducer(sessionAppReducer, emptySessionAppState);
+  const composerAttachmentsRef = useRef<PromptImageAttachment[]>([]);
   const dragOffsetRef = useRef(0);
   const feedRef = useRef<HTMLElement | null>(null);
   const settingsRef = useRef<HTMLDivElement | null>(null);
@@ -154,6 +171,18 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(SESSION_STATE_KEY, JSON.stringify(state));
   }, [state]);
+
+  useEffect(() => {
+    composerAttachmentsRef.current = composerAttachments;
+  }, [composerAttachments]);
+
+  useEffect(() => {
+    return () => {
+      composerAttachmentsRef.current.forEach((attachment) => {
+        URL.revokeObjectURL(attachment.previewUrl);
+      });
+    };
+  }, []);
 
   useEffect(() => {
     const unsubscribe = runner.subscribe((event) => {
@@ -297,13 +326,21 @@ export default function App() {
 
   async function handleComposerSubmit() {
     const prompt = composerValue.trim();
-    if (!prompt) {
+    if (!prompt && composerAttachments.length === 0) {
       return;
     }
 
     if (selectedSession) {
-      await runner.sendInput(selectedSession.id, prompt);
+      await runner.sendInput({
+        sessionId: selectedSession.id,
+        input: prompt,
+        attachments: composerAttachments
+      });
       setComposerValue("");
+      composerAttachments.forEach((attachment) => {
+        URL.revokeObjectURL(attachment.previewUrl);
+      });
+      setComposerAttachments([]);
       return;
     }
 
@@ -314,9 +351,14 @@ export default function App() {
     await runner.startSession({
       workspace: selectedWorkspace,
       prompt,
-      model: selectedModel
+      model: selectedModel,
+      attachments: composerAttachments
     });
     setComposerValue("");
+    composerAttachments.forEach((attachment) => {
+      URL.revokeObjectURL(attachment.previewUrl);
+    });
+    setComposerAttachments([]);
   }
 
   async function handleInterruptSession() {
@@ -343,11 +385,39 @@ export default function App() {
 
     event.preventDefault();
 
-    if (composerDisabled || composerValue.trim().length === 0) {
+    if (composerDisabled || (composerValue.trim().length === 0 && composerAttachments.length === 0)) {
       return;
     }
 
     await handleComposerSubmit();
+  }
+
+  async function handleComposerPaste(
+    event: React.ClipboardEvent<HTMLTextAreaElement>
+  ) {
+    const imageFiles = Array.from(event.clipboardData.items)
+      .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => file !== null);
+
+    if (imageFiles.length === 0) {
+      return;
+    }
+
+    event.preventDefault();
+    const attachments = await Promise.all(imageFiles.map(readImageAttachment));
+    setComposerAttachments((current) => [...current, ...attachments]);
+  }
+
+  function removeComposerAttachment(attachmentId: string) {
+    setComposerAttachments((current) => {
+      const attachment = current.find((candidate) => candidate.id === attachmentId);
+      if (attachment) {
+        URL.revokeObjectURL(attachment.previewUrl);
+      }
+
+      return current.filter((candidate) => candidate.id !== attachmentId);
+    });
   }
 
   function toggleSystemNoteGroup(groupId: string) {
@@ -673,14 +743,32 @@ export default function App() {
               </label>
             </div>
             <div className="composer__body">
+              {composerAttachments.length > 0 ? (
+                <div className="composer-attachments">
+                  {composerAttachments.map((attachment) => (
+                    <div key={attachment.id} className="composer-attachment">
+                      <img src={attachment.previewUrl} alt="" />
+                      <button
+                        className="composer-attachment__remove"
+                        type="button"
+                        aria-label={`Remove ${attachment.name}`}
+                        onClick={() => removeComposerAttachment(attachment.id)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               <textarea
                 value={composerValue}
                 onChange={(event) => setComposerValue(event.target.value)}
                 onKeyDown={(event) => void handleComposerKeyDown(event)}
+                onPaste={(event) => void handleComposerPaste(event)}
                 placeholder={
                   selectedSession
-                    ? "Continue this session with another message."
-                    : "Start a new Codex session in the selected workspace."
+                    ? "Continue this session with another message. Paste images with Command+V."
+                    : "Start a new Codex session in the selected workspace. Paste images with Command+V."
                 }
                 rows={4}
               />
