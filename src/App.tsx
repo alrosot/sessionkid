@@ -826,23 +826,6 @@ export default function App() {
         {showComposer ? (
           <footer className="composer">
             <div className="composer__toolbar">
-              <div className="composer__actions">
-                <button
-                  className="ghost-button ghost-button--wide"
-                  type="button"
-                  disabled
-                >
-                  Attach Context
-                </button>
-                <button
-                  className="ghost-button ghost-button--wide"
-                  type="button"
-                  onClick={() => void handleInterruptSession()}
-                  disabled={selectedSession?.status !== "running"}
-                >
-                  Interrupt
-                </button>
-              </div>
               <label className="model-select">
                 <span>Model</span>
                 <select
@@ -861,6 +844,22 @@ export default function App() {
                   )}
                 </select>
               </label>
+              <div className="composer__actions">
+                <button
+                  className={
+                    selectedSession?.status === "running"
+                      ? "ghost-button ghost-button--icon ghost-button--danger"
+                      : "ghost-button ghost-button--icon ghost-button--hidden"
+                  }
+                  type="button"
+                  aria-label="Interrupt session"
+                  aria-hidden={selectedSession?.status === "running" ? undefined : true}
+                  tabIndex={selectedSession?.status === "running" ? undefined : -1}
+                  onClick={() => void handleInterruptSession()}
+                >
+                  ×
+                </button>
+              </div>
             </div>
             <div className="composer__body">
               {composerAttachments.length > 0 ? (
