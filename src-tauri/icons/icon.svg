@@ -1,0 +1,41 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="96" y1="72" x2="928" y2="952" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#081325"/>
+      <stop offset="0.55" stop-color="#0C1E3A"/>
+      <stop offset="1" stop-color="#132B4E"/>
+    </linearGradient>
+    <radialGradient id="tealGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(284 262) rotate(46.3322) scale(305.767 261.242)">
+      <stop stop-color="#34D2D8" stop-opacity="0.66"/>
+      <stop offset="1" stop-color="#34D2D8" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="violetGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(782 246) rotate(134.62) scale(301.505 259.079)">
+      <stop stop-color="#7B4CDF" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#7B4CDF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="panelGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(516 709) rotate(89.875) scale(300.001 439.143)">
+      <stop stop-color="#1E5C99" stop-opacity="0.26"/>
+      <stop offset="1" stop-color="#1E5C99" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="160" y="222" width="728" height="584" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="18"/>
+      <feGaussianBlur stdDeviation="24"/>
+      <feComposite in2="hardAlpha" operator="out"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.0117647 0 0 0 0 0.0509804 0 0 0 0 0.121569 0 0 0 0.6 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_1" result="shape"/>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" rx="224" fill="url(#bg)"/>
+  <rect width="1024" height="1024" rx="224" fill="url(#tealGlow)"/>
+  <rect width="1024" height="1024" rx="224" fill="url(#violetGlow)"/>
+  <rect width="1024" height="1024" rx="224" fill="url(#panelGlow)"/>
+  <rect x="56" y="56" width="912" height="912" rx="196" stroke="#8BA9F6" stroke-opacity="0.45" stroke-width="8"/>
+  <rect x="160" y="160" width="704" height="704" rx="156" fill="#0A1830" fill-opacity="0.52" stroke="#5576C8" stroke-opacity="0.25" stroke-width="4"/>
+  <g filter="url(#shadow)">
+    <rect x="457.418" y="219" width="116" height="590" rx="58" transform="rotate(24 457.418 219)" fill="#39CDD4"/>
+    <text x="214" y="622" fill="#F4F8FF" font-family="Arial, Helvetica, sans-serif" font-size="330" font-weight="700" letter-spacing="-22">SK</text>
+  </g>
+</svg>
