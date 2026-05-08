@@ -829,6 +829,50 @@ h3 {
   color: var(--input-placeholder);
 }
 
+.approval-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(240, 169, 65, 0.28);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--input-surface) 78%, var(--waiting) 22%);
+}
+
+.approval-panel__eyebrow {
+  color: var(--waiting);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.approval-panel__prompt,
+.approval-panel__cwd {
+  margin: 0;
+}
+
+.approval-panel__command {
+  margin: 0;
+  padding: 12px 14px;
+  overflow-x: auto;
+  border-radius: 12px;
+  background: rgba(5, 11, 24, 0.72);
+  color: var(--card-text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.approval-panel__cwd {
+  color: var(--text-muted);
+  font-size: 0.84rem;
+}
+
+.approval-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .primary-button {
   min-width: 112px;
 }

@@ -74,10 +74,26 @@ struct CodexSessionRef {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct CodexApprovalResponseInput {
+  session_id: String,
+  decision: ApprovalDecision
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct CodexSessionModelInput {
   session_id: String,
   model: String,
   workspace_path: String
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+enum ApprovalDecision {
+  Approve,
+  ApproveForSession,
+  Deny,
+  Cancel
 }
 
 #[derive(Debug, Serialize)]
@@ -102,10 +118,27 @@ struct PendingUserInputRequest {
 }
 
 #[derive(Debug)]
+enum PendingApprovalRequest {
+  CommandExecution {
+    request_id: u64,
+    available_decisions: Vec<ApprovalDecision>
+  },
+  FileChange {
+    request_id: u64,
+    available_decisions: Vec<ApprovalDecision>
+  },
+  Permissions {
+    request_id: u64,
+    permissions: Value
+  }
+}
+
+#[derive(Debug)]
 struct SessionRuntime {
   thread_id: String,
   current_turn_id: Option<String>,
-  pending_user_input: Option<PendingUserInputRequest>
+  pending_user_input: Option<PendingUserInputRequest>,
+  pending_approval: Option<PendingApprovalRequest>
 }
 
 #[derive(Default)]
@@ -397,10 +430,146 @@ impl CodexAppServer {
             request_id,
             question_ids
           });
+          runtime.pending_approval = None;
         }
       }
 
-      emit_waiting_for_input(app, &thread_id, &question_text);
+      emit_waiting_for_input(
+        app,
+        &thread_id,
+        &question_text,
+        json!({
+          "type": "user-input",
+          "prompt": question_text
+        })
+      );
+      return;
+    }
+
+    if method == "item/commandExecution/requestApproval" {
+      let thread_id = params
+        .get("threadId")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_string();
+      let reason = params.get("reason").and_then(Value::as_str);
+      let options = command_approval_options(
+        params.get("availableDecisions").and_then(Value::as_array)
+      );
+      let command = params.get("command").and_then(Value::as_str);
+      let cwd = params.get("cwd").and_then(Value::as_str);
+
+      if let Ok(mut session_map) = sessions.lock() {
+        if let Some(runtime) = session_map.get_mut(&thread_id) {
+          runtime.pending_user_input = None;
+          runtime.pending_approval = Some(PendingApprovalRequest::CommandExecution {
+            request_id,
+            available_decisions: options.clone()
+          });
+        }
+      }
+
+      let prompt = approval_text("Codex requested approval to run a command.", reason);
+      emit_waiting_for_input(
+        app,
+        &thread_id,
+        &prompt,
+        json!({
+          "type": "approval",
+          "approvalType": "command",
+          "prompt": prompt,
+          "command": command,
+          "cwd": cwd,
+          "options": options.into_iter().map(approval_option).collect::<Vec<_>>()
+        })
+      );
+      return;
+    }
+
+    if method == "item/fileChange/requestApproval" {
+      let thread_id = params
+        .get("threadId")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_string();
+      let reason = params.get("reason").and_then(Value::as_str);
+      let options = vec![
+        ApprovalDecision::Approve,
+        ApprovalDecision::ApproveForSession,
+        ApprovalDecision::Deny,
+        ApprovalDecision::Cancel
+      ];
+
+      if let Ok(mut session_map) = sessions.lock() {
+        if let Some(runtime) = session_map.get_mut(&thread_id) {
+          runtime.pending_user_input = None;
+          runtime.pending_approval = Some(PendingApprovalRequest::FileChange {
+            request_id,
+            available_decisions: options.clone()
+          });
+        }
+      }
+
+      let prompt = approval_text("Codex requested approval to apply file changes.", reason);
+      emit_waiting_for_input(
+        app,
+        &thread_id,
+        &prompt,
+        json!({
+          "type": "approval",
+          "approvalType": "file-change",
+          "prompt": prompt,
+          "command": null,
+          "cwd": null,
+          "options": options.into_iter().map(approval_option).collect::<Vec<_>>()
+        })
+      );
+      return;
+    }
+
+    if method == "item/permissions/requestApproval" {
+      let thread_id = params
+        .get("threadId")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_string();
+      let reason = params.get("reason").and_then(Value::as_str);
+      let cwd = params.get("cwd").and_then(Value::as_str).unwrap_or_default();
+      let permissions = params
+        .get("permissions")
+        .cloned()
+        .unwrap_or_else(permission_denial_profile);
+
+      if let Ok(mut session_map) = sessions.lock() {
+        if let Some(runtime) = session_map.get_mut(&thread_id) {
+          runtime.pending_user_input = None;
+          runtime.pending_approval = Some(PendingApprovalRequest::Permissions {
+            request_id,
+            permissions
+          });
+        }
+      }
+
+      let prompt = approval_text(
+        "Codex requested additional permissions for this turn.",
+        reason
+      );
+      emit_waiting_for_input(
+        app,
+        &thread_id,
+        &prompt,
+        json!({
+          "type": "approval",
+          "approvalType": "permissions",
+          "prompt": prompt,
+          "command": null,
+          "cwd": cwd,
+          "options": [
+            approval_option(ApprovalDecision::Approve),
+            approval_option(ApprovalDecision::Deny)
+          ]
+        })
+      );
       return;
     }
 
@@ -439,6 +608,8 @@ impl CodexAppServer {
         if let Ok(mut session_map) = sessions.lock() {
           if let Some(runtime) = session_map.get_mut(&thread_id) {
             runtime.current_turn_id = Some(turn_id);
+            runtime.pending_user_input = None;
+            runtime.pending_approval = None;
           }
         }
       }
@@ -471,6 +642,8 @@ impl CodexAppServer {
         if let Ok(mut session_map) = sessions.lock() {
           if let Some(runtime) = session_map.get_mut(&thread_id) {
             runtime.current_turn_id = None;
+            runtime.pending_user_input = None;
+            runtime.pending_approval = None;
           }
         }
 
@@ -596,6 +769,46 @@ fn describe_user_input(text: &str, attachment_count: usize) -> String {
   }
 }
 
+fn approval_option(decision: ApprovalDecision) -> Value {
+  json!(match decision {
+    ApprovalDecision::Approve => "approve",
+    ApprovalDecision::ApproveForSession => "approve-for-session",
+    ApprovalDecision::Deny => "deny",
+    ApprovalDecision::Cancel => "cancel"
+  })
+}
+
+fn approval_text(label: &str, reason: Option<&str>) -> String {
+  let trimmed_reason = reason.map(str::trim).filter(|value| !value.is_empty());
+  match trimmed_reason {
+    Some(reason) => format!("{label} {reason}"),
+    None => label.to_string()
+  }
+}
+
+fn command_approval_options(available_decisions: Option<&Vec<Value>>) -> Vec<ApprovalDecision> {
+  let mut options = vec![ApprovalDecision::Approve];
+
+  if available_decisions
+    .into_iter()
+    .flatten()
+    .any(|decision| decision.as_str() == Some("acceptForSession"))
+  {
+    options.push(ApprovalDecision::ApproveForSession);
+  }
+
+  options.push(ApprovalDecision::Deny);
+  options.push(ApprovalDecision::Cancel);
+  options
+}
+
+fn permission_denial_profile() -> Value {
+  json!({
+    "fileSystem": null,
+    "network": null
+  })
+}
+
 fn default_session_prompt(text: &str, attachment_count: usize) -> String {
   let trimmed = text.trim();
   if !trimmed.is_empty() {
@@ -678,7 +891,9 @@ fn ensure_session_runtime<'a>(
       json!({
         "threadId": session_id,
         "cwd": workspace_path,
-        "model": model
+        "model": model,
+        "approvalPolicy": "on-request",
+        "sandbox": "workspace-write"
       })
     )?;
 
@@ -687,7 +902,8 @@ fn ensure_session_runtime<'a>(
       SessionRuntime {
         thread_id: session_id.to_string(),
         current_turn_id: None,
-        pending_user_input: None
+        pending_user_input: None,
+        pending_approval: None
       }
     );
   }
@@ -718,7 +934,8 @@ fn emit_started(app: &AppHandle, input: &CodexStartSessionInput, session_id: &st
         "status": "running",
         "createdAt": timestamp(),
         "updatedAt": timestamp(),
-        "activities": [activity("user-message", &activity_text)]
+        "activities": [activity("user-message", &activity_text)],
+        "pendingRequest": Value::Null
       }
     })
   );
@@ -752,13 +969,19 @@ fn emit_input_received(
   );
 }
 
-fn emit_waiting_for_input(app: &AppHandle, session_id: &str, text: &str) {
+fn emit_waiting_for_input(
+  app: &AppHandle,
+  session_id: &str,
+  text: &str,
+  pending_request: Value
+) {
   emit_event(
     app,
     json!({
       "type": "session.waiting_for_input",
       "sessionId": session_id,
-      "activity": activity("assistant-update", text)
+      "activity": activity("assistant-update", text),
+      "pendingRequest": pending_request
     })
   );
 }
@@ -951,7 +1174,7 @@ fn codex_start_session(
     json!({
       "model": input.model,
       "cwd": input.workspace_path,
-      "approvalPolicy": "never",
+      "approvalPolicy": "on-request",
       "sandbox": "workspace-write",
       "experimentalRawEvents": false,
       "persistExtendedHistory": false
@@ -973,7 +1196,8 @@ fn codex_start_session(
       SessionRuntime {
         thread_id: thread_id.clone(),
         current_turn_id: None,
-        pending_user_input: None
+        pending_user_input: None,
+        pending_approval: None
       }
     );
 
@@ -1044,6 +1268,15 @@ fn codex_send_input(
     return Ok(());
   }
 
+  if runtime.pending_approval.is_some() {
+    emit_failed(
+      &app,
+      &runtime.thread_id,
+      "This session is waiting for an approval decision before it can continue."
+    );
+    return Ok(());
+  }
+
   if let Err(error) = client.send_request(
     "turn/start",
     json!({
@@ -1051,6 +1284,126 @@ fn codex_send_input(
       "input": build_turn_input(&input.input, &input.attachments)?
     })
   ) {
+    emit_failed(&app, &runtime.thread_id, &error);
+  }
+
+  Ok(())
+}
+
+#[tauri::command]
+fn codex_respond_to_approval(
+  app: AppHandle,
+  state: State<'_, AppState>,
+  input: CodexApprovalResponseInput
+) -> Result<(), String> {
+  let mut service = state
+    .codex
+    .lock()
+    .map_err(|_| "session state was poisoned".to_string())?;
+  let sessions = service.sessions.clone();
+  if service.client.is_none() {
+    service.client = Some(CodexAppServer::spawn(&app, sessions.clone())?);
+  }
+  let client = service
+    .client
+    .as_ref()
+    .ok_or_else(|| "failed to initialize codex app-server".to_string())?;
+  let mut sessions = sessions
+    .lock()
+    .map_err(|_| "session state was poisoned".to_string())?;
+  let Some(runtime) = sessions.get_mut(&input.session_id) else {
+    return Ok(());
+  };
+
+  let Some(pending) = runtime.pending_approval.take() else {
+    return Ok(());
+  };
+
+  let response = match pending {
+    PendingApprovalRequest::CommandExecution {
+      request_id,
+      available_decisions
+    } => {
+      let decision = match input.decision {
+        ApprovalDecision::Approve => json!("accept"),
+        ApprovalDecision::ApproveForSession => {
+          if available_decisions.contains(&ApprovalDecision::ApproveForSession) {
+            json!("acceptForSession")
+          } else {
+            json!("accept")
+          }
+        }
+        ApprovalDecision::Deny => json!("decline"),
+        ApprovalDecision::Cancel => json!("cancel")
+      };
+
+      let note = match input.decision {
+        ApprovalDecision::Approve => "Approved command execution.",
+        ApprovalDecision::ApproveForSession => "Approved command execution for the rest of this session.",
+        ApprovalDecision::Deny => "Denied command execution.",
+        ApprovalDecision::Cancel => "Cancelled the turn instead of running the command."
+      };
+
+      emit_progress(&app, &runtime.thread_id, "system-note", note);
+      (request_id, json!({ "decision": decision }))
+    }
+    PendingApprovalRequest::FileChange {
+      request_id,
+      available_decisions
+    } => {
+      let decision = match input.decision {
+        ApprovalDecision::Approve => json!("accept"),
+        ApprovalDecision::ApproveForSession => {
+          if available_decisions.contains(&ApprovalDecision::ApproveForSession) {
+            json!("acceptForSession")
+          } else {
+            json!("accept")
+          }
+        }
+        ApprovalDecision::Deny => json!("decline"),
+        ApprovalDecision::Cancel => json!("cancel")
+      };
+
+      let note = match input.decision {
+        ApprovalDecision::Approve => "Approved file changes.",
+        ApprovalDecision::ApproveForSession => "Approved file changes for the rest of this session.",
+        ApprovalDecision::Deny => "Denied file changes.",
+        ApprovalDecision::Cancel => "Cancelled the turn instead of applying the file changes."
+      };
+
+      emit_progress(&app, &runtime.thread_id, "system-note", note);
+      (request_id, json!({ "decision": decision }))
+    }
+    PendingApprovalRequest::Permissions {
+      request_id,
+      permissions
+    } => {
+      let (granted_permissions, note) = match input.decision {
+        ApprovalDecision::Approve | ApprovalDecision::ApproveForSession => (
+          permissions,
+          "Approved additional permissions for this turn."
+        ),
+        ApprovalDecision::Deny | ApprovalDecision::Cancel => (
+          permission_denial_profile(),
+          "Denied additional permissions for this turn."
+        )
+      };
+
+      emit_progress(&app, &runtime.thread_id, "system-note", note);
+      (
+        request_id,
+        json!({
+          "permissions": granted_permissions,
+          "scope": "turn",
+          "strictAutoReview": false
+        })
+      )
+    }
+  };
+
+  runtime.pending_user_input = None;
+
+  if let Err(error) = client.send_response(response.0, response.1) {
     emit_failed(&app, &runtime.thread_id, &error);
   }
 
@@ -1091,7 +1444,9 @@ fn codex_set_session_model(
     json!({
       "threadId": runtime.thread_id,
       "cwd": input.workspace_path,
-      "model": input.model
+      "model": input.model,
+      "approvalPolicy": "on-request",
+      "sandbox": "workspace-write"
     })
   )?;
 
@@ -1142,7 +1497,11 @@ fn codex_interrupt_session(
   emit_waiting_for_input(
     &app,
     &runtime.thread_id,
-    "Execution interrupted. Provide more input to continue."
+    "Execution interrupted. Provide more input to continue.",
+    json!({
+      "type": "user-input",
+      "prompt": "Execution interrupted. Provide more input to continue."
+    })
   );
   Ok(())
 }
@@ -1232,6 +1591,7 @@ pub fn run() {
       codex_start_session,
       codex_set_session_model,
       codex_send_input,
+      codex_respond_to_approval,
       codex_interrupt_session,
       codex_dispose_session
     ])

@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { SessionRunner } from "../../session/runner";
 import type {
+  RespondToApprovalInput,
   SessionModelOption,
   SessionModelSelection,
   SendSessionInput,
@@ -70,6 +71,15 @@ export class CodexRunner implements SessionRunner {
         model: input.model,
         workspacePath: input.workspacePath,
         attachments: input.attachments ?? []
+      }
+    });
+  }
+
+  async respondToApproval(input: RespondToApprovalInput): Promise<void> {
+    await invoke("codex_respond_to_approval", {
+      input: {
+        sessionId: input.sessionId,
+        decision: input.decision
       }
     });
   }

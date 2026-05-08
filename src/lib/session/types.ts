@@ -42,6 +42,26 @@ export type SessionActivity = {
   timestamp: string;
 };
 
+export type SessionApprovalDecision =
+  | "approve"
+  | "approve-for-session"
+  | "deny"
+  | "cancel";
+
+export type SessionPendingRequest =
+  | {
+      type: "user-input";
+      prompt: string;
+    }
+  | {
+      type: "approval";
+      approvalType: "command" | "file-change" | "permissions";
+      prompt: string;
+      command: string | null;
+      cwd: string | null;
+      options: SessionApprovalDecision[];
+    };
+
 export type Session = {
   id: string;
   workspaceId: string;
@@ -53,6 +73,7 @@ export type Session = {
   createdAt: string;
   updatedAt: string;
   activities: SessionActivity[];
+  pendingRequest: SessionPendingRequest | null;
 };
 
 export type StartSessionInput = {
@@ -80,6 +101,11 @@ export type SendSessionInput = {
   attachments?: PromptImageAttachment[];
 };
 
+export type RespondToApprovalInput = {
+  sessionId: string;
+  decision: SessionApprovalDecision;
+};
+
 export type SessionEvent =
   | {
       type: "session.started";
@@ -94,6 +120,7 @@ export type SessionEvent =
       type: "session.waiting_for_input";
       sessionId: string;
       activity: SessionActivity;
+      pendingRequest: SessionPendingRequest;
     }
   | {
       type: "session.completed";

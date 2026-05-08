@@ -13,6 +13,7 @@ import {
 } from "./lib/session/store";
 import type {
   PromptImageAttachment,
+  SessionApprovalDecision,
   Session,
   SessionModelOption,
   Workspace
@@ -89,6 +90,19 @@ async function readImageAttachment(file: File): Promise<PromptImageAttachment> {
 
 function summarizeSystemNote(text: string) {
   return text.trim().replace(/\s+/g, " ");
+}
+
+function approvalButtonLabel(decision: SessionApprovalDecision) {
+  switch (decision) {
+    case "approve":
+      return "Approve";
+    case "approve-for-session":
+      return "Approve for Session";
+    case "deny":
+      return "Deny";
+    case "cancel":
+      return "Cancel Turn";
+  }
 }
 
 function groupActivities(activities: Session["activities"]): ActivityGroup[] {
@@ -459,6 +473,17 @@ export default function App() {
     await runner.interrupt(selectedSession.id);
   }
 
+  async function handleApprovalDecision(decision: SessionApprovalDecision) {
+    if (!selectedSession || selectedSession.pendingRequest?.type !== "approval") {
+      return;
+    }
+
+    await runner.respondToApproval({
+      sessionId: selectedSession.id,
+      decision
+    });
+  }
+
   function handleStartWorkspaceSession(workspaceId: string) {
     dispatch({
       type: "workspace.new-session",
@@ -553,8 +578,15 @@ export default function App() {
     setSelectedModel(nextModel);
   }
 
+  const pendingApproval =
+    selectedSession?.pendingRequest?.type === "approval"
+      ? selectedSession.pendingRequest
+      : null;
   const composerDisabled =
-    !selectedWorkspace || !selectedModel || selectedSession?.status === "running";
+    !selectedWorkspace ||
+    !selectedModel ||
+    selectedSession?.status === "running" ||
+    pendingApproval !== null;
   const showComposer = state.workspaces.length > 0;
   const visibleActivities = selectedSession?.activities ?? [];
   const groupedActivities = groupActivities(visibleActivities);
@@ -862,35 +894,68 @@ export default function App() {
               </div>
             </div>
             <div className="composer__body">
-              {composerAttachments.length > 0 ? (
-                <div className="composer-attachments">
-                  {composerAttachments.map((attachment) => (
-                    <div key={attachment.id} className="composer-attachment">
-                      <img src={attachment.previewUrl} alt="" />
+              {pendingApproval ? (
+                <section className="approval-panel">
+                  <div className="approval-panel__eyebrow">
+                    Approval required · {pendingApproval.approvalType}
+                  </div>
+                  <p className="approval-panel__prompt">{pendingApproval.prompt}</p>
+                  {pendingApproval.command ? (
+                    <pre className="approval-panel__command">{pendingApproval.command}</pre>
+                  ) : null}
+                  {pendingApproval.cwd ? (
+                    <div className="approval-panel__cwd">{pendingApproval.cwd}</div>
+                  ) : null}
+                  <div className="approval-panel__actions">
+                    {pendingApproval.options.map((decision) => (
                       <button
-                        className="composer-attachment__remove"
+                        key={decision}
+                        className={
+                          decision === "approve" || decision === "approve-for-session"
+                            ? "secondary-button"
+                            : "ghost-button"
+                        }
                         type="button"
-                        aria-label={`Remove ${attachment.name}`}
-                        onClick={() => removeComposerAttachment(attachment.id)}
+                        onClick={() => void handleApprovalDecision(decision)}
                       >
-                        ×
+                        {approvalButtonLabel(decision)}
                       </button>
+                    ))}
+                  </div>
+                </section>
+              ) : (
+                <>
+                  {composerAttachments.length > 0 ? (
+                    <div className="composer-attachments">
+                      {composerAttachments.map((attachment) => (
+                        <div key={attachment.id} className="composer-attachment">
+                          <img src={attachment.previewUrl} alt="" />
+                          <button
+                            className="composer-attachment__remove"
+                            type="button"
+                            aria-label={`Remove ${attachment.name}`}
+                            onClick={() => removeComposerAttachment(attachment.id)}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              ) : null}
-              <textarea
-                value={composerValue}
-                onChange={(event) => setComposerValue(event.target.value)}
-                onKeyDown={(event) => void handleComposerKeyDown(event)}
-                onPaste={(event) => void handleComposerPaste(event)}
-                placeholder={
-                  selectedSession
-                    ? "Continue this session with another message. Paste images with Command+V."
-                    : "Start a new Codex session in the selected workspace. Paste images with Command+V."
-                }
-                rows={4}
-              />
+                  ) : null}
+                  <textarea
+                    value={composerValue}
+                    onChange={(event) => setComposerValue(event.target.value)}
+                    onKeyDown={(event) => void handleComposerKeyDown(event)}
+                    onPaste={(event) => void handleComposerPaste(event)}
+                    placeholder={
+                      selectedSession
+                        ? "Continue this session with another message. Paste images with Command+V."
+                        : "Start a new Codex session in the selected workspace. Paste images with Command+V."
+                    }
+                    rows={4}
+                  />
+                </>
+              )}
             </div>
           </footer>
         ) : null}

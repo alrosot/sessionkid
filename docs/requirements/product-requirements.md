@@ -30,7 +30,7 @@
 ## Out Of Scope For First Version
 
 - Multi-provider execution support beyond Codex
-- Rich approval UI beyond the current waiting-for-input flow
+- Multi-step or highly detailed approval workflows beyond inline approve/deny handling
 - Settings, authentication management, and advanced workspace configuration
 
 ## Functional Requirements
@@ -47,6 +47,7 @@
 - [x] Change the tray icon state when sessions are running, waiting for user input, or errored
 - [x] Let the user reopen the app from the tray
 - [x] Trigger macOS notifications when a session enters the waiting-for-user-input state
+- [x] Surface Codex approval requests inline in the active session and let the user approve or deny them without leaving the session view
 
 ## Non-Functional Requirements
 
@@ -70,7 +71,7 @@
 ## Risks And Unknowns
 
 - The current Codex transport is compile-verified but still early in real-runtime validation against diverse session flows
-- Approval and waiting-for-input UX is intentionally narrow and may need a richer surface once more Codex request types are handled
+- Approval and waiting-for-input UX is intentionally compact and may need richer detail or batching if Codex request types expand further
 - Long-term persistence format and migration strategy are still intentionally simple
 
 ## Open Questions

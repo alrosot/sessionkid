@@ -43,7 +43,8 @@ function sanitizeSession(session: Session): Session {
   return {
     ...session,
     status,
-    activities: Array.isArray(session.activities) ? session.activities : []
+    activities: Array.isArray(session.activities) ? session.activities : [],
+    pendingRequest: null
   };
 }
 
@@ -240,7 +241,8 @@ export function sessionAppReducer(
           ...state,
           sessions: patchSession(state.sessions, event.sessionId, (session) => ({
             ...appendActivity(session, event),
-            status: "running"
+            status: "running",
+            pendingRequest: null
           }))
         };
       }
@@ -250,7 +252,8 @@ export function sessionAppReducer(
           ...state,
           sessions: patchSession(state.sessions, event.sessionId, (session) => ({
             ...appendActivity(session, event),
-            status: "running"
+            status: "running",
+            pendingRequest: null
           })),
           selectedSessionId: event.sessionId
         };
@@ -261,7 +264,8 @@ export function sessionAppReducer(
           ...state,
           sessions: patchSession(state.sessions, event.sessionId, (session) => ({
             ...appendActivity(session, event),
-            status: "waiting-for-user-input"
+            status: "waiting-for-user-input",
+            pendingRequest: event.pendingRequest
           })),
           selectedSessionId: event.sessionId
         };
@@ -272,7 +276,8 @@ export function sessionAppReducer(
           ...state,
           sessions: patchSession(state.sessions, event.sessionId, (session) => ({
             ...appendActivity(session, event),
-            status: "idle"
+            status: "idle",
+            pendingRequest: null
           }))
         };
       }
@@ -282,7 +287,8 @@ export function sessionAppReducer(
           ...state,
           sessions: patchSession(state.sessions, event.sessionId, (session) => ({
             ...appendActivity(session, event),
-            status: "error"
+            status: "error",
+            pendingRequest: null
           })),
           selectedSessionId: event.sessionId
         };
