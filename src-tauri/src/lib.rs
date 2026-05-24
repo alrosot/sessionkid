@@ -3,9 +3,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
   collections::HashMap,
+  env,
   fs,
   io::{BufRead, BufReader, Write},
-  path::PathBuf,
+  path::{Path, PathBuf},
   process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio},
   sync::{
     atomic::{AtomicU64, Ordering},
@@ -27,6 +28,20 @@ const MENU_QUIT: &str = "quit";
 const CODEX_EVENT_NAME: &str = "codex-session-event";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const SESSION_STATE_FILE: &str = "session-state.json";
+const DEFAULT_CODEX_PATHS: &[&str] = &[
+  "/opt/homebrew/bin/codex",
+  "/usr/local/bin/codex",
+  "/usr/bin/codex",
+  "/bin/codex"
+];
+const DEFAULT_SPAWN_PATHS: &[&str] = &[
+  "/opt/homebrew/bin",
+  "/usr/local/bin",
+  "/usr/bin",
+  "/bin",
+  "/usr/sbin",
+  "/sbin"
+];
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -186,18 +201,124 @@ impl TrayState {
   }
 }
 
+fn existing_executable(path: impl AsRef<Path>) -> Option<PathBuf> {
+  let path = path.as_ref();
+  if path.is_file() {
+    Some(path.to_path_buf())
+  } else {
+    None
+  }
+}
+
+fn home_relative_codex_paths() -> Vec<PathBuf> {
+  let Some(home) = env::var_os("HOME").map(PathBuf::from) else {
+    return Vec::new();
+  };
+
+  [
+    ".local/bin/codex",
+    ".cargo/bin/codex",
+    ".npm-global/bin/codex",
+    "node_modules/.bin/codex"
+  ]
+  .into_iter()
+  .map(|path| home.join(path))
+  .collect()
+}
+
+fn resolve_codex_binary_from_shell() -> Option<PathBuf> {
+  let shell = env::var_os("SHELL")
+    .map(PathBuf::from)
+    .filter(|path| path.is_file())
+    .unwrap_or_else(|| PathBuf::from("/bin/zsh"));
+
+  let output = Command::new(shell)
+    .args(["-lc", "command -v codex"])
+    .output()
+    .ok()?;
+
+  if !output.status.success() {
+    return None;
+  }
+
+  let path = String::from_utf8_lossy(&output.stdout);
+  existing_executable(path.trim())
+}
+
+fn resolve_codex_binary() -> Result<PathBuf, String> {
+  for env_key in ["SESSION_KID_CODEX_PATH", "CODEX_PATH"] {
+    if let Some(path) = env::var_os(env_key).map(PathBuf::from) {
+      return existing_executable(&path).ok_or_else(|| {
+        format!(
+          "{env_key} points to '{}', but that file does not exist",
+          path.display()
+        )
+      });
+    }
+  }
+
+  for path in DEFAULT_CODEX_PATHS {
+    if let Some(path) = existing_executable(path) {
+      return Ok(path);
+    }
+  }
+
+  for path in home_relative_codex_paths() {
+    if let Some(path) = existing_executable(path) {
+      return Ok(path);
+    }
+  }
+
+  if let Some(path) = resolve_codex_binary_from_shell() {
+    return Ok(path);
+  }
+
+  Err(
+    "could not find the Codex CLI. Install Codex or set SESSION_KID_CODEX_PATH to the codex executable path.".to_string()
+  )
+}
+
+fn codex_spawn_path() -> String {
+  let mut paths: Vec<PathBuf> = DEFAULT_SPAWN_PATHS.iter().map(PathBuf::from).collect();
+
+  if let Some(home) = env::var_os("HOME").map(PathBuf::from) {
+    paths.extend([
+      home.join(".local/bin"),
+      home.join(".cargo/bin"),
+      home.join(".npm-global/bin")
+    ]);
+  }
+
+  if let Some(current_path) = env::var_os("PATH") {
+    paths.extend(env::split_paths(&current_path));
+  }
+
+  env::join_paths(paths)
+    .ok()
+    .and_then(|path| path.into_string().ok())
+    .unwrap_or_else(|| DEFAULT_SPAWN_PATHS.join(":"))
+}
+
 impl CodexAppServer {
   fn spawn(
     app: &AppHandle,
     sessions: Arc<Mutex<HashMap<String, SessionRuntime>>>
   ) -> Result<Self, String> {
-    let mut child = Command::new("codex")
+    let codex_binary = resolve_codex_binary()?;
+
+    let mut child = Command::new(&codex_binary)
       .args(["app-server"])
+      .env("PATH", codex_spawn_path())
       .stdin(Stdio::piped())
       .stdout(Stdio::piped())
       .stderr(Stdio::piped())
       .spawn()
-      .map_err(|error| format!("failed to launch codex app-server: {error}"))?;
+      .map_err(|error| {
+        format!(
+          "failed to launch codex app-server from '{}': {error}",
+          codex_binary.display()
+        )
+      })?;
 
     let stdin = child
       .stdin
