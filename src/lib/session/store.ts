@@ -13,6 +13,7 @@ export type SessionAppAction =
   | { type: "workspace.selected"; workspaceId: string }
   | { type: "workspace.new-session"; workspaceId: string }
   | { type: "session.selected"; sessionId: string }
+  | { type: "session.deleted"; sessionId: string }
   | { type: "session.model-changed"; sessionId: string; model: string }
   | { type: "runner.event"; event: SessionEvent };
 
@@ -144,6 +145,25 @@ function patchSession(
   );
 }
 
+function resolveSelectedSessionId(
+  sessions: Session[],
+  selectedWorkspaceId: string | null,
+  selectedSessionId: string | null
+): string | null {
+  if (selectedSessionId && sessions.some((session) => session.id === selectedSessionId)) {
+    return selectedSessionId;
+  }
+
+  if (selectedWorkspaceId) {
+    const workspaceSessions = getSessionsForWorkspace(sessions, selectedWorkspaceId);
+    if (workspaceSessions.length > 0) {
+      return workspaceSessions[0].id;
+    }
+  }
+
+  return sessions[0]?.id ?? null;
+}
+
 function shouldPersistActivity(text: string): boolean {
   return text.trim() !== HIDDEN_ACTIVITY_TEXT;
 }
@@ -208,6 +228,29 @@ export function sessionAppReducer(
         ...state,
         selectedWorkspaceId: session.workspaceId,
         selectedSessionId: session.id
+      };
+    }
+    case "session.deleted": {
+      const deletedSession = state.sessions.find((session) => session.id === action.sessionId);
+      if (!deletedSession) {
+        return state;
+      }
+
+      const sessions = state.sessions.filter((session) => session.id !== action.sessionId);
+      const selectedWorkspaceId =
+        state.selectedWorkspaceId === deletedSession.workspaceId
+          ? deletedSession.workspaceId
+          : state.selectedWorkspaceId;
+
+      return {
+        ...state,
+        sessions,
+        selectedWorkspaceId,
+        selectedSessionId: resolveSelectedSessionId(
+          sessions,
+          selectedWorkspaceId,
+          state.selectedSessionId === action.sessionId ? null : state.selectedSessionId
+        )
       };
     }
     case "session.model-changed":

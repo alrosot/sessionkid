@@ -30,11 +30,11 @@ Wireframe spec: [wireframe-spec.md](/Users/arosot/code/sessionkid/docs/app-layou
 ### Sidebar Navigation
 
 - Purpose: Persistent navigation for workspace and session selection
-- Primary user actions: Add a workspace, select a workspace, create a new session for that workspace, select a session
+- Primary user actions: Add a workspace, select a workspace, create a new session for that workspace, select a session, delete a session
 - Required data: Workspace names, session names, ordering, selected row state, per-session status, session counts
 - Empty state: Show the workspace heading and an otherwise empty navigation area with no seeded workspaces or sessions
 - Error state: Keep the selected session visible if cached and show a compact retry state for failed workspace loading
-- Notes: Rows should support keyboard selection, hover state, and an obvious active-item highlight. Workspace rows should not display the full filesystem path. At the default sidebar width, the layout should comfortably show workspace labels and roughly 40 characters of one-line session summary before truncation.
+- Notes: Rows should support keyboard selection, hover state, and an obvious active-item highlight. Deleting a session should require destructive confirmation and remove it from persisted local state immediately. Workspace rows should not display the full filesystem path. At the default sidebar width, the layout should comfortably show workspace labels and roughly 40 characters of one-line session summary before truncation.
 
 ### Session Header
 

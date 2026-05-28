@@ -933,11 +933,9 @@ h3 {
 }
 
 .session-row {
-  display: grid;
+  display: flex;
+  align-items: stretch;
   gap: 6px;
-  width: 100%;
-  padding: 10px 12px;
-  text-align: left;
   border: 1px solid var(--border);
   border-radius: 14px;
   background: var(--session-surface);
@@ -952,11 +950,31 @@ h3 {
   background: var(--session-selected-surface);
 }
 
+.session-row__button {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 0 10px 12px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  color: inherit;
+}
+
+.session-row__rail {
+  display: flex;
+  width: 26px;
+  flex: 0 0 26px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 8px 8px 0;
+}
+
 .session-row__topline {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
   min-width: 0;
 }
 
@@ -970,6 +988,26 @@ h3 {
 .session-row__meta {
   color: var(--text-muted);
   font-size: 0.84rem;
+}
+
+.session-row__delete {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1;
+}
+
+.session-row__delete:hover {
+  border-color: rgba(220, 87, 87, 0.24);
+  background: rgba(220, 87, 87, 0.12);
+  color: var(--error);
 }
 
 .status-dot {

@@ -491,6 +491,19 @@ export default function App() {
     });
   }
 
+  async function handleDeleteSession(session: Session) {
+    const confirmed = window.confirm(`Delete session "${session.title}"? This cannot be undone.`);
+    if (!confirmed) {
+      return;
+    }
+
+    await runner.dispose(session.id);
+    dispatch({
+      type: "session.deleted",
+      sessionId: session.id
+    });
+  }
+
   async function handleComposerKeyDown(
     event: React.KeyboardEvent<HTMLTextAreaElement>
   ) {
@@ -660,29 +673,44 @@ export default function App() {
                           {workspaceSessions.map((session) => {
                             const isActive = session.id === state.selectedSessionId;
                             return (
-                              <button
+                              <div
                                 key={session.id}
                                 className={
                                   isActive
                                     ? "session-row session-row--selected"
                                     : "session-row"
                                 }
-                                type="button"
-                                onClick={() =>
-                                  dispatch({
-                                    type: "session.selected",
-                                    sessionId: session.id
-                                  })
-                                }
                               >
-                                <div className="session-row__topline">
-                                  <strong>{session.title}</strong>
+                                <button
+                                  className="session-row__button"
+                                  type="button"
+                                  onClick={() =>
+                                    dispatch({
+                                      type: "session.selected",
+                                      sessionId: session.id
+                                    })
+                                  }
+                                >
+                                  <div className="session-row__topline">
+                                    <strong>{session.title}</strong>
+                                  </div>
+                                  <span className="session-row__meta">
+                                    {formatSessionMeta(session)}
+                                  </span>
+                                </button>
+                                <div className="session-row__rail">
                                   <span className={`status-dot status-dot--${session.status}`} />
+                                  <button
+                                    className="session-row__delete"
+                                    type="button"
+                                    aria-label={`Delete session ${session.title}`}
+                                    title="Delete session"
+                                    onClick={() => void handleDeleteSession(session)}
+                                  >
+                                    x
+                                  </button>
                                 </div>
-                                <span className="session-row__meta">
-                                  {formatSessionMeta(session)}
-                                </span>
-                              </button>
+                              </div>
                             );
                           })}
                         </div>

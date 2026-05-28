@@ -21,7 +21,7 @@ Wireframe spec: [wireframe-spec.md](/Users/arosot/code/sessionkid/docs/app-layou
 
 1. Workspace Sidebar
    - Purpose: Let the user browse workspaces and select a session within each workspace
-   - Key actions: Add a workspace, select a workspace, create a new session for a workspace, switch active session
+   - Key actions: Add a workspace, select a workspace, create a new session for a workspace, switch active session, delete a session with confirmation
 2. Session View
    - Purpose: Show the currently selected session title, project context, and chronological activity
    - Key actions: Read updates, inspect edited files, review progress notes, expand collapsed system notes, keep context on the active task
