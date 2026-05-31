@@ -16,6 +16,7 @@ import type {
   SessionApprovalDecision,
   Session,
   SessionModelOption,
+  SessionStatus,
   Workspace
 } from "./lib/session/types";
 
@@ -75,6 +76,19 @@ function formatSessionMeta(session: Session) {
   const messageCount = countVisibleMessages(session);
   const messageLabel = messageCount === 1 ? "1 message" : `${messageCount} messages`;
   return `${formatSessionCreatedAt(session.createdAt)} · ${messageLabel}`;
+}
+
+function formatStatusLabel(status: SessionStatus) {
+  switch (status) {
+    case "idle":
+      return "Idle";
+    case "running":
+      return "Running";
+    case "waiting-for-user-input":
+      return "Waiting for user input";
+    case "error":
+      return "Error";
+  }
 }
 
 async function readImageAttachment(file: File): Promise<PromptImageAttachment> {
@@ -699,7 +713,11 @@ export default function App() {
                                   </span>
                                 </button>
                                 <div className="session-row__rail">
-                                  <span className={`status-dot status-dot--${session.status}`} />
+                                  <span
+                                    className={`status-dot status-dot--${session.status}`}
+                                    title={formatStatusLabel(session.status)}
+                                    aria-label={formatStatusLabel(session.status)}
+                                  />
                                   <button
                                     className="session-row__delete"
                                     type="button"

@@ -26,7 +26,7 @@ body[data-theme="dark"] {
   --accent-strong: #7347d6;
   --idle: #7185ac;
   --running: #37c0c9;
-  --waiting: #f0a941;
+  --waiting: #ffb02e;
   --error: #f06b83;
   --surface: rgba(16, 31, 56, 0.86);
   --surface-hover: rgba(55, 192, 201, 0.12);
@@ -43,6 +43,8 @@ body[data-theme="dark"] {
   --system-note-surface: rgba(4, 10, 22, 0.72);
   --user-message-surface: rgba(28, 74, 100, 0.42);
   --user-message-border: rgba(55, 192, 201, 0.2);
+  --file-activity-surface: rgba(63, 43, 114, 0.48);
+  --file-activity-border: rgba(151, 120, 245, 0.24);
   --assistant-message-surface: transparent;
   --system-note-group-surface: rgba(8, 15, 29, 0.72);
   --system-note-group-border: rgba(124, 157, 219, 0.1);
@@ -77,7 +79,7 @@ body[data-theme="light"] {
   --accent-strong: #6b52c8;
   --idle: #5f728d;
   --running: #1f8f9b;
-  --waiting: #c57d14;
+  --waiting: #d97904;
   --error: #c1464f;
   --surface: rgba(255, 255, 255, 0.8);
   --surface-hover: rgba(31, 143, 155, 0.08);
@@ -94,6 +96,8 @@ body[data-theme="light"] {
   --system-note-surface: rgba(19, 32, 51, 0.06);
   --user-message-surface: rgba(31, 143, 155, 0.09);
   --user-message-border: rgba(31, 143, 155, 0.18);
+  --file-activity-surface: rgba(107, 82, 200, 0.1);
+  --file-activity-border: rgba(107, 82, 200, 0.2);
   --assistant-message-surface: transparent;
   --system-note-group-surface: rgba(19, 32, 51, 0.03);
   --system-note-group-border: rgba(19, 32, 51, 0.08);
@@ -254,9 +258,10 @@ h3 {
 
 .status-pill {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   margin-bottom: 12px;
+  border: 1px solid transparent;
   border-radius: 999px;
   padding: 8px 12px;
   font-size: 0.92rem;
@@ -275,13 +280,17 @@ h3 {
 }
 
 .status-pill--running {
-  background: rgba(31, 122, 101, 0.12);
+  background: rgba(55, 192, 201, 0.16);
+  border-color: rgba(55, 192, 201, 0.32);
   color: var(--running);
+  animation: status-pulse 1.6s ease-in-out infinite;
 }
 
 .status-pill--waiting-for-user-input {
-  background: rgba(216, 130, 0, 0.12);
+  background: rgba(255, 176, 46, 0.2);
+  border-color: rgba(255, 176, 46, 0.46);
   color: var(--waiting);
+  box-shadow: 0 0 0 1px rgba(255, 176, 46, 0.08), 0 0 24px rgba(255, 176, 46, 0.12);
 }
 
 .status-pill--error {
@@ -704,8 +713,8 @@ h3 {
 }
 
 .activity-log--file-activity {
-  background: var(--surface-hover);
-  border-color: var(--surface-hover-border);
+  background: var(--file-activity-surface);
+  border-color: var(--file-activity-border);
 }
 
 .composer {
@@ -1011,10 +1020,12 @@ h3 {
 }
 
 .status-dot {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.18);
   flex: 0 0 auto;
+  box-shadow: 0 0 0 2px rgba(4, 10, 22, 0.3);
 }
 
 .status-dot--idle {
@@ -1023,14 +1034,54 @@ h3 {
 
 .status-dot--running {
   background: var(--running);
+  border-color: rgba(125, 224, 229, 0.55);
+  box-shadow:
+    0 0 0 2px rgba(55, 192, 201, 0.16),
+    0 0 16px rgba(55, 192, 201, 0.5);
+  animation: status-dot-pulse 1.25s ease-in-out infinite;
 }
 
 .status-dot--waiting-for-user-input {
   background: var(--waiting);
+  border-color: rgba(255, 231, 186, 0.75);
+  box-shadow:
+    0 0 0 2px rgba(255, 176, 46, 0.24),
+    0 0 18px rgba(255, 176, 46, 0.62);
 }
 
 .status-dot--error {
   background: var(--error);
+}
+
+@keyframes status-dot-pulse {
+  0%,
+  100% {
+    opacity: 0.48;
+    transform: scale(0.9);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+}
+
+@keyframes status-pulse {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-dot--running,
+  .status-pill--running {
+    animation: none;
+  }
 }
 
 .workspace-card__button span {
