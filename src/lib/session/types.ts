@@ -29,6 +29,13 @@ export type SessionModelOption = {
   isDefault: boolean;
 };
 
+export type UsageLimit = {
+  id: string;
+  label: string;
+  remainingPercent: number;
+  resetsAt: number | null;
+};
+
 export type SessionActivityKind =
   | "user-message"
   | "assistant-update"

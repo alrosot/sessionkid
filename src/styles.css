@@ -390,6 +390,63 @@ h3 {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
+}
+
+.usage-limits {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.usage-limit {
+  display: grid;
+  width: 128px;
+  gap: 5px;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.usage-limit__meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.usage-limit__meta span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.usage-limit__meta strong {
+  flex: 0 0 auto;
+  color: var(--card-text);
+  font-size: 0.82rem;
+}
+
+.usage-limit__track {
+  position: relative;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-muted) 22%, transparent);
+}
+
+.usage-limit__bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: #5ec66f;
 }
 
 .settings-menu {
@@ -1081,6 +1138,16 @@ h3 {
   .status-dot--running,
   .status-pill--running {
     animation: none;
+  }
+}
+
+@media (max-width: 1280px) {
+  .usage-limit {
+    width: 112px;
+  }
+
+  .context-chip {
+    max-width: 34ch;
   }
 }
 

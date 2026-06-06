@@ -8,7 +8,8 @@ import type {
   SendSessionInput,
   SessionEvent,
   SessionHandle,
-  StartSessionInput
+  StartSessionInput,
+  UsageLimit
 } from "../../session/types";
 
 type CodexStartSessionOutput = {
@@ -51,6 +52,10 @@ export class CodexRunner implements SessionRunner {
 
   async listModels(): Promise<SessionModelOption[]> {
     return invoke<SessionModelOption[]>("codex_list_models");
+  }
+
+  async getUsageLimits(): Promise<UsageLimit[]> {
+    return invoke<UsageLimit[]>("codex_get_usage_limits");
   }
 
   async setSessionModel(input: SessionModelSelection): Promise<void> {

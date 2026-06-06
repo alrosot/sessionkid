@@ -126,6 +126,15 @@ struct CodexModelOption {
   is_default: bool
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CodexUsageLimit {
+  id: String,
+  label: String,
+  remaining_percent: f64,
+  resets_at: Option<f64>
+}
+
 #[derive(Debug)]
 struct PendingUserInputRequest {
   request_id: u64,
@@ -375,6 +384,18 @@ impl CodexAppServer {
   }
 
   fn send_request(&self, method: &str, params: Value) -> Result<Value, String> {
+    self.send_request_with_optional_params(method, Some(params))
+  }
+
+  fn send_request_without_params(&self, method: &str) -> Result<Value, String> {
+    self.send_request_with_optional_params(method, None)
+  }
+
+  fn send_request_with_optional_params(
+    &self,
+    method: &str,
+    params: Option<Value>
+  ) -> Result<Value, String> {
     let id = self.next_id.fetch_add(1, Ordering::SeqCst);
     let (tx, rx) = mpsc::channel();
     self
@@ -383,11 +404,13 @@ impl CodexAppServer {
       .map_err(|_| "codex app-server pending map was poisoned".to_string())?
       .insert(id, tx);
 
-    let message = json!({
+    let mut message = json!({
       "method": method,
-      "id": id,
-      "params": params
+      "id": id
     });
+    if let Some(params) = params {
+      message["params"] = params;
+    }
 
     if let Err(error) = self.write_message(&message) {
       let _ = self
@@ -1161,6 +1184,89 @@ fn session_state_path(app: &AppHandle) -> Result<PathBuf, String> {
   Ok(app_data_dir.join(SESSION_STATE_FILE))
 }
 
+fn format_usage_limit_label(window_duration_mins: Option<u64>, fallback: &str) -> String {
+  match window_duration_mins {
+    Some(300) => "5h limit".to_string(),
+    Some(1_440) => "Daily limit".to_string(),
+    Some(10_080) => "Weekly limit".to_string(),
+    Some(minutes) if minutes < 60 => format!("{minutes}m limit"),
+    Some(minutes) if minutes % 60 == 0 && minutes < 1_440 => {
+      format!("{}h limit", minutes / 60)
+    }
+    Some(minutes) if minutes % 1_440 == 0 => {
+      format!("{}d limit", minutes / 1_440)
+    }
+    _ => fallback.to_string()
+  }
+}
+
+fn append_usage_window(
+  limits: &mut Vec<CodexUsageLimit>,
+  bucket_id: &str,
+  fallback_label: &str,
+  window_kind: &str,
+  window: Option<&Value>
+) {
+  let Some(window) = window else {
+    return;
+  };
+  let Some(used_percent) = window.get("usedPercent").and_then(Value::as_f64) else {
+    return;
+  };
+
+  let window_duration_mins = window
+    .get("windowDurationMins")
+    .and_then(Value::as_u64);
+  let label = format_usage_limit_label(window_duration_mins, fallback_label);
+  let remaining_percent = (100.0 - used_percent).clamp(0.0, 100.0);
+  let resets_at = window.get("resetsAt").and_then(Value::as_f64);
+
+  limits.push(CodexUsageLimit {
+    id: format!("{bucket_id}-{window_kind}"),
+    label,
+    remaining_percent,
+    resets_at
+  });
+}
+
+fn parse_usage_limits(response: &Value) -> Vec<CodexUsageLimit> {
+  let snapshot = response
+    .get("rateLimitsByLimitId")
+    .and_then(|limits| limits.get("codex"))
+    .or_else(|| response.get("rateLimits"));
+
+  let Some(snapshot) = snapshot else {
+    return Vec::new();
+  };
+
+  let bucket_id = snapshot
+    .get("limitId")
+    .and_then(Value::as_str)
+    .unwrap_or("codex");
+  let fallback_label = snapshot
+    .get("limitName")
+    .and_then(Value::as_str)
+    .unwrap_or("Usage limit");
+  let mut limits = Vec::new();
+
+  append_usage_window(
+    &mut limits,
+    bucket_id,
+    fallback_label,
+    "primary",
+    snapshot.get("primary")
+  );
+  append_usage_window(
+    &mut limits,
+    bucket_id,
+    fallback_label,
+    "secondary",
+    snapshot.get("secondary")
+  );
+
+  limits
+}
+
 #[tauri::command]
 fn set_tray_state(app: AppHandle, state: TrayState) -> Result<(), String> {
   apply_tray_state(&app, state).map_err(|error| error.to_string())?;
@@ -1269,6 +1375,28 @@ fn codex_list_models(
     .collect::<Vec<_>>();
 
   Ok(models)
+}
+
+#[tauri::command]
+fn codex_get_usage_limits(
+  app: AppHandle,
+  state: State<'_, AppState>
+) -> Result<Vec<CodexUsageLimit>, String> {
+  let mut service = state
+    .codex
+    .lock()
+    .map_err(|_| "session state was poisoned".to_string())?;
+  let sessions = service.sessions.clone();
+  if service.client.is_none() {
+    service.client = Some(CodexAppServer::spawn(&app, sessions)?);
+  }
+  let client = service
+    .client
+    .as_ref()
+    .ok_or_else(|| "failed to initialize codex app-server".to_string())?;
+
+  let response = client.send_request_without_params("account/rateLimits/read")?;
+  Ok(parse_usage_limits(&response))
 }
 
 #[tauri::command]
@@ -1709,6 +1837,7 @@ pub fn run() {
       load_session_state,
       save_session_state,
       codex_list_models,
+      codex_get_usage_limits,
       codex_start_session,
       codex_set_session_model,
       codex_send_input,

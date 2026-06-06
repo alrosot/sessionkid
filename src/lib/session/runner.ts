@@ -4,7 +4,8 @@ import type {
   SessionEvent,
   SessionHandle,
   SessionModelSelection,
-  StartSessionInput
+  StartSessionInput,
+  UsageLimit
 } from "./types";
 
 export interface SessionRunner {
@@ -15,5 +16,6 @@ export interface SessionRunner {
   interrupt(sessionId: string): Promise<void>;
   resume(sessionId: string): Promise<void>;
   dispose(sessionId: string): Promise<void>;
+  getUsageLimits(): Promise<UsageLimit[]>;
   subscribe(listener: (event: SessionEvent) => void): () => void;
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -17,6 +17,7 @@ import type {
   Session,
   SessionModelOption,
   SessionStatus,
+  UsageLimit,
   Workspace
 } from "./lib/session/types";
 
@@ -91,6 +92,25 @@ function formatStatusLabel(status: SessionStatus) {
   }
 }
 
+function clampPercent(value: number) {
+  return Math.min(100, Math.max(0, value));
+}
+
+function formatUsageReset(value: number | null) {
+  if (value === null) {
+    return "Reset time unavailable";
+  }
+
+  const timestamp = value > 1_000_000_000_000 ? value : value * 1000;
+  return `Resets ${new Date(timestamp).toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  })}`;
+}
+
 async function readImageAttachment(file: File): Promise<PromptImageAttachment> {
   const buffer = await file.arrayBuffer();
   return {
@@ -162,6 +182,7 @@ export default function App() {
   const [availableModels, setAvailableModels] = useState<SessionModelOption[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
   const [theme, setTheme] = useState<ThemeMode>("dark");
+  const [usageLimits, setUsageLimits] = useState<UsageLimit[]>([]);
   const [expandedSystemNoteGroups, setExpandedSystemNoteGroups] = useState<Set<string>>(
     () => new Set()
   );
@@ -172,6 +193,14 @@ export default function App() {
   const feedRef = useRef<HTMLElement | null>(null);
   const settingsRef = useRef<HTMLDivElement | null>(null);
   const runner = useMemo(() => new CodexRunner(), []);
+
+  const refreshUsageLimits = useCallback(async () => {
+    try {
+      setUsageLimits(await runner.getUsageLimits());
+    } catch {
+      setUsageLimits([]);
+    }
+  }, [runner]);
 
   useEffect(() => {
     let cancelled = false;
@@ -259,12 +288,25 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = runner.subscribe((event) => {
       dispatch({ type: "runner.event", event });
+      void refreshUsageLimits();
     });
 
     return () => {
       unsubscribe();
     };
-  }, [runner]);
+  }, [refreshUsageLimits, runner]);
+
+  useEffect(() => {
+    void refreshUsageLimits();
+
+    const refreshInterval = window.setInterval(() => {
+      void refreshUsageLimits();
+    }, 5 * 60 * 1000);
+
+    return () => {
+      window.clearInterval(refreshInterval);
+    };
+  }, [refreshUsageLimits]);
 
   useEffect(() => {
     let cancelled = false;
@@ -757,6 +799,40 @@ export default function App() {
         <header className="main-pane__header">
           <h2>{selectedSession ? selectedSession.title : "No session selected"}</h2>
           <div className="main-pane__controls">
+            {usageLimits.length > 0 ? (
+              <div className="usage-limits" aria-label="Codex usage limits">
+                {usageLimits.map((limit) => {
+                  const remainingPercent = Math.round(clampPercent(limit.remainingPercent));
+                  const resetLabel = formatUsageReset(limit.resetsAt);
+
+                  return (
+                    <div
+                      key={limit.id}
+                      className="usage-limit"
+                      title={`${remainingPercent}% remaining. ${resetLabel}`}
+                    >
+                      <div className="usage-limit__meta">
+                        <span>{limit.label}</span>
+                        <strong>{remainingPercent}%</strong>
+                      </div>
+                      <div
+                        className="usage-limit__track"
+                        role="progressbar"
+                        aria-label={`${limit.label}: ${remainingPercent}% remaining. ${resetLabel}`}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={remainingPercent}
+                      >
+                        <span
+                          className="usage-limit__bar"
+                          style={{ width: `${remainingPercent}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
             <div className="context-chip">
               {selectedWorkspace ? selectedWorkspace.path : "No workspace attached"}
             </div>
