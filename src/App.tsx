@@ -704,6 +704,7 @@ export default function App() {
                         <button
                           className="workspace-card__button"
                           type="button"
+                          title={workspace.path}
                           onClick={() =>
                             dispatch({
                               type: "workspace.selected",
@@ -833,9 +834,6 @@ export default function App() {
                 })}
               </div>
             ) : null}
-            <div className="context-chip">
-              {selectedWorkspace ? selectedWorkspace.path : "No workspace attached"}
-            </div>
             <div ref={settingsRef} className="settings-menu">
               <button
                 className="settings-menu__trigger"
